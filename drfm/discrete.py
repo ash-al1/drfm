@@ -27,7 +27,7 @@ class to_discrete:
             self.edges.append(np.linspace(low, high, obs_bins[i] + 1)[1:-1])
 
     def discretize(self, obs: np.ndarray) -> int:
-        """Convert a continuous observation vector into a single state index."""
+        """Convert a continuous observation vector into a single state index"""
         indices = []
         for i in range(self.n_dims):
             low, high = self.obs_ranges[i]
@@ -42,14 +42,7 @@ class to_discrete:
         return state
 
     def discretize_batch(self, obs_batch: np.ndarray) -> np.ndarray:
-        """Vectorized discretization for (num_envs, n_dims) observations.
-
-        Args:
-            obs_batch: shape (num_envs, n_dims)
-
-        Returns:
-            state_indices: shape (num_envs,) of discrete state indices
-        """
+        """Vectorized discretization for (num_envs, n_dims) observations"""
         num_envs = obs_batch.shape[0]
 
         # clip all observations at once
