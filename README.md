@@ -39,10 +39,6 @@ export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.
 ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 
-<video width="600" autoplay loop muted>
-  <source src="media/start.webm" type="video/webm">
-</video>
-
 --------
 
 ## Project Organization
@@ -81,6 +77,8 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 + Claude for programming
 + Kaufmann, Elia, et al. "Champion-level drone racing using deep reinforcement learning." Nature 620.7976 (2023): 982-987.
 + Reinforcement Learning Richard S. Sutton, Andrew G. Barto 2018
++ Merrick, Russell. Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners. No Starch Press, 2023.
++ [TD Learning](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
 + Project structure used in repository [Cookiecutter](https://cookiecutter-data-science.drivendata.org)
 + DRFM circuit figure \& general information [DRFM history, circuit & testing](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
 + Cognitive radio/RF basics [NATO Cognitive Radio Technical Report](https://www.sic.rma.ac.be/~vlenir/publications/STO-TR-IST-077.pdf)
