@@ -84,6 +84,7 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 + Kaufmann, Elia, et al. "Champion-level drone racing using deep reinforcement learning." Nature 620.7976 (2023): 982-987.
 + Reinforcement Learning Richard S. Sutton, Andrew G. Barto 2018
 + Merrick, Russell. Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners. No Starch Press, 2023.
++ [Radar equations](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
 + [Radar Jamming and Deception](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
 + [TD Learning](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
 + Project structure used in repository [Cookiecutter](https://cookiecutter-data-science.drivendata.org)
