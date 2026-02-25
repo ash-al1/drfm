@@ -25,7 +25,7 @@ like PMBM and δ-GLMB (Poisson and Bernoulli). MTT has high dimensional
 parameters, long term time tracking.
 
 Environment is "standard multitarget transition and observation models for point
-objects without target spawning". New processes arrive following some Posson
+objects without target spawning". New processes arrive following some Poisson
 point process and a λ birthing intensity others depart with iid markovian and
 survival probability is p\_s(x). Clutter and object measurements independant of
 all other objects. MT-estimation using moving window i.e. given τ time-steps.
@@ -64,3 +64,31 @@ Implementation of a DRFM System." 2019 IEEE Radar Conference (RadarConf). IEEE,
 
 You, Shixun, Ming Diao, and Lipeng Gao. "Deep reinforcement learning for target
 searching in cognitive electronic warfare." IEEE Access 7 (2019): 37432-37447.
+
+---
+
+Sequential Monte Carlo Cardinalized probability hypothesized density filter
+based on Track-Before-Detect for fluctuating targets in heavy-tailed clutter
+
+Baysian filtering in heavy-tailed clutter environment. Heavy mathematics,
+frankly didn't read much besides a quick pass this is way over my head -
+although fundamentally explains the kind of environment and method of problem
+solving traditional and existing methods use. Heavy-tailed clutter
+(k-distribution and G0-distribution instead of Rayeligh), and fluctuating
+targets (swerling types 1 and 3 models). Track-before-detect operates on raw
+signal data before threshold, building confidence over multiple frames before
+declaring a target exists. Papers often do this kind of thing, where confidence
+is the measure they use to build belief whether a target exists or not, because
+RDR is extremely noise heavy.
+
+---
+
+A robust multiple target tracking framework with Transformer-based data
+association and dynamic trajectory management in challenging environments
+
+Cross transformer with data association within traditional tracking (BLUE and
+trajectory management). Attention gives features from position only measurement
+as opposed to angle of arrival or rough position estimates, not full state
+vectors. Some mechanism in place that handles targets appearing and
+disappearing, losing sight etc. More realistic that what the project aims to be
+in its infancy.
