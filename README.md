@@ -28,7 +28,7 @@ RF components into the environment to maybe something like
 
 | Circuit | Block Diagram |
 |:---:|:---:|
-| ![Circuit](media/asd-1.png) | ![Block Diagram](media/draw.png) |
+| ![Circuit](media/asd.png) | ![Block Diagram](media/draw.png) |
 
 ## Setup
 
