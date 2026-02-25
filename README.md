@@ -26,7 +26,9 @@ RF components into the environment to maybe something like
 
 ## DRFM Module
 
-![DRFM](media/draw.png)
+| Circuit | Block Diagram |
+|:---:|:---:|
+| ![Circuit](media/asd-1.png) | ![Block Diagram](media/draw.png) |
 
 ## Setup
 
@@ -67,8 +69,12 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
     ├── agent.py
     ├── discrete.py
     └── libs
-        ├── libmdp.py
-        └── libsparse.py
+        ├── libmdp.py       <- Markov Decision Process (Value+Policy iteration) 
+        ├── libsparse.py    <- MDP Sparse
+        ├── libql.py        <- Q-learning
+        ├── libtd.py        <- Temporal-difference
+        ├── libsarsa.py     <- SARSA
+        └── libmcarlo.py    <- Monte Carlo
 ```
 
 --------
@@ -78,6 +84,7 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 + Kaufmann, Elia, et al. "Champion-level drone racing using deep reinforcement learning." Nature 620.7976 (2023): 982-987.
 + Reinforcement Learning Richard S. Sutton, Andrew G. Barto 2018
 + Merrick, Russell. Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners. No Starch Press, 2023.
++ [Radar Jamming and Deception](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
 + [TD Learning](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
 + Project structure used in repository [Cookiecutter](https://cookiecutter-data-science.drivendata.org)
 + DRFM circuit figure \& general information [DRFM history, circuit & testing](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
