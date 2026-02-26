@@ -5,8 +5,7 @@
 + Create simple grid, drone and radar objects in Isaac sim
     + Script a flight path, try and pull entity poses can be exported per
       timestep
-+ Build a simple gymnasium wrapper environment mockup
-    + Define observation space (pos, J/s ratio) and discrete action space
++ Create realistic action space for DRFM module
 + Use Isaac sim to export drone pos/vel. emitter location, LoS or not. Feed
   data into RF model, compute J/S and detection. Echo, Jamming power,J/S ratio,
   etc. Agent receives J/S ratio and detection status as observation vector, then
@@ -66,6 +65,8 @@
 ---
 
 # Done:
++ Build a simple gymnasium wrapper environment mockup
+    + Define observation space (pos, J/s ratio) and discrete action space
 + Implement core RF (basic) modeling on a standalone python file
     + Radar echo, Jamming power, J/S ratio, burn-through range
 + Monte Carlo
