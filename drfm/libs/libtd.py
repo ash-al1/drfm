@@ -33,7 +33,7 @@ class TD:
         """Epsilon-greedy policy"""
         def policy(state):
             probs = np.ones(self.n_actions, dtype=float) * epsilon / self.n_actions
-            best_action = np.argcmax(Q[state])
+            best_action = np.argmax(Q[state])
             probs[best_action] += 1.0 - epsilon
             return probs
         return policy
@@ -50,7 +50,7 @@ class TD:
         Returns:
             V: State value function
         """
-        for i in range(num_episode):
+        for i in range(num_episodes):
             if (i + 1) % 1000 == 0:
                 print(f"\rEpisode {i+1}/{num_episodes}")
 
@@ -60,7 +60,7 @@ class TD:
                 if done:
                     td_target = reward
                 else:
-                    td_target = reward(self.gamma * self.V[next_state])
+                    td_target = reward + (self.gamma * self.V[next_state])
                 td_delta = td_target - self.V[state]
                 self.V[state] += self.alpha * td_delta
 
@@ -81,7 +81,7 @@ class TD:
         """
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
-                print(f"\rEpisode {i_episode+1}/{num_episodes}")
+                print(f"\rEpisode {i+1}/{num_episodes}")
 
             episode = generate_episode()
             T = len(episode)
@@ -123,7 +123,7 @@ class TD:
                 print(f"\rEpisode {i+1}/{num_episodes}")
 
             E = defaultdict(float)
-            epsiode = generate_episodes()
+            episode = generate_episode()
 
             for state, action, reward, next_state, done in episode:
                 if done:

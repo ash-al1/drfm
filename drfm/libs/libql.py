@@ -39,11 +39,13 @@ class QL:
             Q: Action value function
             π: epsilon-greedy policy
         """
+        policy = self.epsilon_greedy_policy(epsilon)
+
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
                 print(f"\rEpisode {i+1}/{num_episodes}")
 
-            episode = generate_episodes()
+            episode = generate_episode()
 
             for state, action, reward, next_state, done in episode:
                 best_next_action = np.argmax(self.Q[next_state])
@@ -54,15 +56,15 @@ class QL:
                     td_target = reward + (self.gamma *
                                           self.Q[next_state][best_next_action])
 
-                    td_delta = td_target - self.Q[state][action]
-                    self.Q[state][action] += self.alpha * td_delta
+                td_delta = td_target - self.Q[state][action]
+                self.Q[state][action] += self.alpha * td_delta
 
         return self.Q, policy
 
-    def q0(self, generate_episode: callable, num_episodes: int, n: int = 5,
+    def qn(self, generate_episode: callable, num_episodes: int, n: int = 5,
            epsilon: float = 0.1) -> tuple[dict, callable]:
         """Q-Learning (N)
-        
+
         Args:
             generate_episode: Callable that returns (s, a, r, s', done) tuple
             num_episodes: self-evident eh?
@@ -77,20 +79,20 @@ class QL:
 
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
-                print(f"\rEpisode {+1}/{num_episodes}")
+                print(f"\rEpisode {i+1}/{num_episodes}")
 
             episode = generate_episode()
             T = len(episode)
 
             for t in range(T):
                 G = 0.0
-                
-                for i in range(t, min(t+1, T)):
+
+                for i in range(t, min(t+n, T)):
                     _, _, reward, _, _ = episode[i]
-                    G += (self.gamma * (i-t)) * reward
+                    G += (self.gamma ** (i-t)) * reward
 
                 if t + n < T:
-                    bootstrap = episode[t+1][0]
+                    bootstrap = episode[t+n][0]
                     best_next_action = np.argmax(self.Q[bootstrap])
                     G += (self.gamma ** n) * self.Q[bootstrap][best_next_action]
 
@@ -100,10 +102,10 @@ class QL:
 
         return self.Q, policy
 
-    def qlambda(self, generate_episode: callable, float 0.0, lamda: float = 0.9,
+    def qlambda(self, generate_episode: callable, num_episodes: int, lamda: float = 0.9,
                 epsilon: float = 0.1) -> tuple[dict, callable]:
         """Q-Learning (λ)
-        
+
         Args:
             generate_episode: Callable that returns (s, a, r, s', done) tuple
             num_episodes: self-evident eh?
@@ -130,18 +132,18 @@ class QL:
                     td_target = reward
                 else:
                     td_target = reward + (self.gamma *
-                                          self.Q[net_state][best_next_action])
-                    
-                    td_delta = td_target - self.Q[state][action]
+                                          self.Q[next_state][best_next_action])
 
-                    E[state][action] += 1.0
-                    
-                    for s in E:
-                        self.Q[s] += self.alpha * td_delta * E[s]
-                        E[s] += self.gamma * lamda
+                td_delta = td_target - self.Q[state][action]
 
-                    if action != best_next_action:
-                        E = defaultdict(lambda: np.zeros(self.n_actions))
+                E[state][action] += 1.0
+
+                for s in E:
+                    self.Q[s] += self.alpha * td_delta * E[s]
+                    E[s] *= self.gamma * lamda
+
+                if action != best_next_action:
+                    E = defaultdict(lambda: np.zeros(self.n_actions))
 
         return self.Q, policy
 

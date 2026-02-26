@@ -23,12 +23,14 @@
 ---
 
 # Ideas
-+ GNU Radio acting as RF backend with Isaac Sim?
-+ 
++ GNU Radio connector for RF backend?
++ FPGA usb 3.0 connected, isolated, latency w.r.t. simulator: handles DRFM
+  compute isolated from simulator RF backend & drone robotics?
 
 ---
 
 # Qs:
++ In what situations does the DRFM module do: X - i.e. when to time/freq etc?
 + Should I focus on theoretical guarantees? This devolves the project down into
   reading theoretical books on digital signal processing, wireless
   communications and other books (radar) for the purpose of extracting
@@ -36,9 +38,6 @@
   and appending them into layers at feature extraction points or other
   mathematically attractive positions. -> All this to say, is this really good
   enough for the project?
-+ GNU Radio connector for RF backend?
-+ FPGA usb 3.0 connected, isolated, latency w.r.t. simulator: handles DRFM
-  compute isolated from simulator RF backend & drone robotics?
 
 ---
 
