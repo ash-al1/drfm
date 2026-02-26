@@ -23,6 +23,7 @@
 ---
 
 # Ideas
++ Pegasus Simulator?
 + GNU Radio connector for RF backend?
 + FPGA usb 3.0 connected, isolated, latency w.r.t. simulator: handles DRFM
   compute isolated from simulator RF backend & drone robotics?
