@@ -581,4 +581,4 @@ def _run_greedy(ql: QL, num_episodes: int = 5, step_delay: float = 0.3):
 
 
 if __name__ == "__main__":
-    ql = train(num_episodes=20_000, render_final=True)
+    ql = train(num_episodes=5_000, render_final=True)
