@@ -45,7 +45,7 @@ class SARSA:
         policy = self.epsilon_greedy_policy(epsilon)
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
-                print(f"\rEpisode {i}/{num_episodes}")
+                print(f"\rEpisode {i+1}/{num_episodes}")
 
             episode = generate_episode()
 
@@ -67,7 +67,7 @@ class SARSA:
         return self.Q, policy
 
     def sarsan(self, generate_episode: callable, num_episodes: int,
-               epsilon: float = 0.1) -> tuple[dict, callable]:
+               epsilon: float = 0.1, n: int = 5) -> tuple[dict, callable]:
         """SARSA(N)
 
         Args:
@@ -82,16 +82,16 @@ class SARSA:
         policy = self.epsilon_greedy_policy(epsilon)
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
-                print(f"\rEpisode {i}/{num_episodes}")
+                print(f"\rEpisode {i+1}/{num_episodes}")
 
             episode = generate_episode()
             T = len(episode)
 
             for t in range(T):
                 G = 0.0
-                for i in range(t, min(t+n, T)):
-                    state, action, reward, next_state, done = episode[t]
-                    G += (self.gamma ** (i-t)) * reward
+                for j in range(t, min(t+n, T)):
+                    state, action, reward, next_state, done = episode[j]
+                    G += (self.gamma ** (j-t)) * reward
 
                 if t+n < T:
                     bootstrap, bootstrap_action, _, _, _ = episode[t+n]
@@ -121,7 +121,7 @@ class SARSA:
         policy = self.epsilon_greedy_policy(epsilon)
         for i in range(num_episodes):
             if (i+1) % 1000 == 0:
-                print(f"\rEpisode {i}/{num_episodes}")
+                print(f"\rEpisode {i+1}/{num_episodes}")
 
             E = defaultdict(lambda: np.zeros(self.n_actions))
             episode = generate_episode()
@@ -137,13 +137,13 @@ class SARSA:
                 else:
                     td_target = reward + (self.gamma *
                                           self.Q[next_state][next_action])
-                    td_delta = td_target - self.Q[state][action]
 
-                    E[state][action] += 1.0
-                    
-                     for s in E:
-                         self.Q[s] += self.alpha * td_delta * E[s]
-                         E[s] *= self.gamma * lamda
+                td_delta = td_target - self.Q[state][action]
+                E[state][action] += 1.0
+
+                for s in E:
+                    self.Q[s] += self.alpha * td_delta * E[s]
+                    E[s] *= self.gamma * lamda
 
         return self.Q, policy
 
