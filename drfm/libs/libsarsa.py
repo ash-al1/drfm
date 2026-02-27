@@ -73,6 +73,7 @@ class SARSA:
         Args:
             generate_episode: Callable that returns (s, a, r, s', done) tuple
             num_episodes: self-evident eh?
+            n: n-step look ahead
             epsilon: Exploration alpha
 
         Returns:
