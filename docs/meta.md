@@ -12,7 +12,8 @@
   calculates reward based off agent perforamnce. +1 reward every timestep alive,
   maybe bonus if radar loses track, penalties for being detected and locked on.
 + Tabular RL Q-learning model implementation to test a simple agent can learn to
-  survive. Agents actions could be to select DRFM module parameters.
+  survive. Agents actions could be to select DRFM module parameters. Drone
+  maneuvarability should be continuous algorithm.
 
 ---
 
@@ -22,10 +23,15 @@
 ---
 
 # Ideas
++ Use the nature racing drone concept of implementing controller and firmware
+  for input peculiarities to the drone input, we can do the same for DRFM module
+  Mesarcik's DRFM implementation ... plug and play
 + Pegasus Simulator?
 + GNU Radio connector for RF backend?
 + FPGA usb 3.0 connected, isolated, latency w.r.t. simulator: handles DRFM
   compute isolated from simulator RF backend & drone robotics?
++ Mesarcik uses: Frequency + doppler, time, amplitude shifts - what should we
+  use? Check the patent and other files I have on USB
 
 ---
 
