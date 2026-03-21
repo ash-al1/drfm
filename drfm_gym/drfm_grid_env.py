@@ -44,7 +44,6 @@ from gymnasium import spaces
 
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "env_rf"))
 
 from libs.libql import QL
 from basic_model import js_ratio, burn_through
