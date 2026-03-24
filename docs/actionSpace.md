@@ -55,13 +55,13 @@ How: trigger threshold
 
 
 Skin return power:
-`$$P_{rT} = \frac{P_r G_T^2 \sigma_T \lambda^2}{(4\pi)^3 R^4} \quad \text{(10.38)}$$`
+$$P_{rT} = \frac{P_r G_T^2 \sigma_T \lambda^2}{(4\pi)^3 R^4} \quad \text{(10.38)}$$
 
 DRFM transponder power:
-`$$P_{rj} = \frac{P_j G_j G_r \lambda^2}{(4\pi R)^2} \quad \text{(10.39)}$$`
+$$P_{rj} = \frac{P_j G_j G_r \lambda^2}{(4\pi R)^2} \quad \text{(10.39)}$$
 
 First-order approximation to JSR:
-`$$\frac{J}{S} = \frac{P_j G_j 4\pi R^2}{P_r G_r \sigma_T} \quad \text{(10.40)}$$`
+$$\frac{J}{S} = \frac{P_j G_j 4\pi R^2}{P_r G_r \sigma_T} \quad \text{(10.40)}$$
 
 
 RGBM signal processing:
