@@ -83,7 +83,7 @@ Change received signal of radar or comm signal by modulating in time, frequency,
 amplitude, etc of the Tx signal. DRFM repeater modeled as constant gain system.
 
 - Power at radar from the DRFM jammer is (Poynting vector x antenna effective
-aperture x EA jammer signal): P_rj = $$ \left( \frac{P_r G_r}{4\pi R^2} \right) \left( \frac{G_r \lambda^2}{4\pi} \right) \left( \frac{G_{jrcv} G G_{jxmt} \lambda^2}{4\pi R^2} \right) $$
+aperture x EA jammer signal): P_rj = $$\left( \frac{P_r G_r}{4\pi R^2} \right) \left( \frac{G_r \lambda^2}{4\pi} \right) \left( \frac{G_{jrcv} G G_{jxmt} \lambda^2}{4\pi R^2} \right)$$
 
 - Power at radar from RCS: P_rT = $$ \left( \frac{P_r G_r}{4\pi R^2} \right) \left( \frac{G_r \lambda^2}{4\pi} \right) \left( \frac{\sigma_T}{4\pi R^2} \right) $$
 
@@ -104,8 +104,8 @@ JSR goes to infinity as a result.
 Radar split gates centers using search information, balances signal energy
 between early and late range gates.
 
-Delay time smoothly (or in stair-step realistically) increases, the phae change
-over time is: \Delta\phi = -2\pi \left( f_0 \beta - [2f_0\beta] + [f_0\beta] \right)
+Delay time smoothly (or in stair-step realistically) increases, the phase change
+over time is: $$\Delta\phi = -2\pi \left( f_0 \beta - [2f_0\beta] + [f_0\beta] \right)$$
 
 Its important to take into consideration rate of pull-off of the DRFM, if its
 too quick then radar will clip back to skin return; typically either linear or
@@ -145,10 +145,10 @@ Sampling rate of ADC on DRFM needs to be higher than sampling rate of radar.
 
 SAR use scorrelation processing, noise EA is not effective.
 
-Range deception modulator can produce decoy target at delta x: H_n(\omega) = \sigma_n \exp(j 2 k \Delta x_n
+Range deception modulator can produce decoy target at delta x: $$H_n(\omega) = \sigma_n \exp(j 2 k \Delta x_n$$
 
 Azimuth deception can produce a decoy target at delta y, a deception modulator
-in azimuth can be represented as: H_n(\omega, u) = \sigma_n \exp\left( jk \frac{ (\Delta y)^2 - 2u\Delta y }{R} \right)
+in azimuth can be represented as: $$H_n(\omega, u) = \sigma_n \exp\left( jk \frac{ (\Delta y)^2 - 2u\Delta y }{R} \right)$$
 
 EA needs to know radar location at every moment for azimuth deception. The
 azimuth deception modulator can be simplified as: $$H_n(\omega, \theta) = \sigma_n \exp(-j 2 k \Delta y \sin \theta)$$
