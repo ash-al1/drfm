@@ -25,24 +25,30 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
 <table align="center">
     <tr>
         <td>
-            <img src="media/transponder.gif" height="200px" />
+            <img src="media/transponder.gif" height="200px" /><br>
+            Transponder
         </td>
         <td>
-            <img src="media/repeater.gif" height="200px" />
+            <img src="media/repeater.gif" height="200px" /><br>
+            Repeater
         </td>
         <td>
-            <img src="media/rgpo.gif" height="200px" />
+            <img src="media/rgpo.gif" height="200px" /><br>
+            RGPO
         </td>
     </tr>
     <tr>
         <td>
-            <img src="media/vgpo.gif" height="200px" />
+            <img src="media/vgpo.gif" height="200px" /><br>
+            VGPO
         </td>
         <td>
-            <img src="media/rgpo+vgpo.gif" height="200px" />
+            <img src="media/rgpo+vgpo.gif" height="200px" /><br>
+            Coordinated
         </td>
         <td>
-            <img src="media/sarmap.gif" height="200px" />
+            <img src="media/sarmap.gif" height="200px" /><br>
+            SAR Decoy
         </td>
     </tr>
 </table>
