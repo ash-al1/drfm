@@ -148,6 +148,99 @@ class SARSA:
 
         return self.Q, policy
 
+    def sarsalambda_forward(self, generate_episode: callable, num_episodes: int,
+                            lamda: float = 0.9,
+                            epsilon: float = 0.1) -> tuple[dict, callable]:
+        """SARSA(λ) forward view using λ-weighted n-step returns
+
+        Args:
+            generate_episode: Callable that returns (s, a, r, s', done) tuple
+            num_episodes: self-evident eh?
+            lamda: decay param [0, 1]
+            epsilon: Exploration alpha
+
+        Returns:
+            Q: Action value function
+            π: epsilon-greedy policy
+        """
+        policy = self.epsilon_greedy_policy(epsilon)
+
+        for i in range(num_episodes):
+            if (i+1) % 1000 == 0:
+                print(f"\rEpisode {i+1}/{num_episodes}")
+
+            episode = generate_episode()
+            T = len(episode)
+
+            rewards = [ep[2] for ep in episode]
+            states  = [ep[0] for ep in episode]
+            actions = [ep[1] for ep in episode]
+
+            for t in range(T):
+                G_partial = 0.0
+                lambda_return = 0.0
+
+                # Accumulate (1-λ) * λ^(n-1) * G_t^n; on-policy bootstrap via Q[s'][a']
+                for n in range(1, T - t):
+                    G_partial += (self.gamma ** (n - 1)) * rewards[t + n - 1]
+                    G_n = G_partial + (self.gamma ** n) * self.Q[states[t + n]][actions[t + n]]
+                    lambda_return += (1 - lamda) * (lamda ** (n - 1)) * G_n
+
+                # Terminal return
+                G_partial += (self.gamma ** (T - t - 1)) * rewards[T - 1]
+                lambda_return += (lamda ** (T - t - 1)) * G_partial
+
+                sa = self.Q[states[t]][actions[t]]
+                self.Q[states[t]][actions[t]] += self.alpha * (lambda_return - sa)
+
+        return self.Q, policy
+
+    def sarsan_backward(self, generate_episode: callable, num_episodes: int,
+                        epsilon: float = 0.1, n: int = 5) -> tuple[dict, callable]:
+        """SARSA(n) backward view using eligibility traces with n-step cutoff
+
+        Args:
+            generate_episode: Callable that returns (s, a, r, s', done) tuple
+            num_episodes: self-evident eh?
+            n: trace cutoff in steps
+            epsilon: Exploration alpha
+
+        Returns:
+            Q: Action value function
+            π: epsilon-greedy policy
+        """
+        policy = self.epsilon_greedy_policy(epsilon)
+
+        for i in range(num_episodes):
+            if (i+1) % 1000 == 0:
+                print(f"\rEpisode {i+1}/{num_episodes}")
+
+            E = defaultdict(lambda: np.zeros(self.n_actions))
+            visit_t = {}
+            episode = generate_episode()
+
+            for t in range(len(episode) - 1):
+                state, action, reward, next_state, done = episode[t]
+                next_action_probs = policy(next_state)
+                next_action = np.random.choice(self.n_actions, p=next_action_probs)
+
+                if done:
+                    td_target = reward
+                else:
+                    td_target = reward + (self.gamma * self.Q[next_state][next_action])
+                td_delta = td_target - self.Q[state][action]
+
+                E[state][action] += 1.0
+                visit_t[state] = t
+
+                for s in E:
+                    self.Q[s] += self.alpha * td_delta * E[s]
+                    E[s] *= self.gamma
+                    if (t - visit_t.get(s, t)) >= n:
+                        E[s] = np.zeros(self.n_actions)
+
+        return self.Q, policy
+
     def get_policy_state(self, state: int) -> np.ndarray:
         probs = np.zeros(self.n_actions)
         best_action = np.argmax(self.Q[state])

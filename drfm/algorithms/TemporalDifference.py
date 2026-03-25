@@ -140,5 +140,85 @@ class TD:
 
         return self.V
 
+    def tdlambda_forward(self, generate_episode: callable, policy: callable,
+                         num_episodes: int, lamda: float = 0.9) -> dict:
+        """TD(λ) forward view using λ-weighted n-step returns
+
+        Args:
+            generate_episode: Callable that returns (s, a, r, s', done) tuple
+            policy: policy s->a
+            num_episodes: self-evident eh?
+            lamda: decay param [0, 1]
+
+        Returns:
+            V: State value function
+        """
+        for i in range(num_episodes):
+            if (i+1) % 1000 == 0:
+                print(f"\rEpisode {i+1}/{num_episodes}")
+
+            episode = generate_episode()
+            T = len(episode)
+
+            rewards = [ep[2] for ep in episode]
+            states  = [ep[0] for ep in episode]
+
+            for t in range(T):
+                G_partial = 0.0
+                lambda_return = 0.0
+
+                # Accumulate (1-λ) * λ^(n-1) * G_t^n for each n
+                for n in range(1, T - t):
+                    G_partial += (self.gamma ** (n - 1)) * rewards[t + n - 1]
+                    G_n = G_partial + (self.gamma ** n) * self.V[states[t + n]]
+                    lambda_return += (1 - lamda) * (lamda ** (n - 1)) * G_n
+
+                # Terminal return (full, no bootstrap)
+                G_partial += (self.gamma ** (T - t - 1)) * rewards[T - 1]
+                lambda_return += (lamda ** (T - t - 1)) * G_partial
+
+                self.V[states[t]] += self.alpha * (lambda_return - self.V[states[t]])
+
+        return self.V
+
+    def tdn_backward(self, generate_episode: callable, policy: callable,
+                     num_episodes: int, n: int = 5) -> dict:
+        """TD(n) backward view using eligibility traces with n-step cutoff
+
+        Args:
+            generate_episode: Callable that returns (s, a, r, s', done) tuple
+            policy: policy s->a
+            num_episodes: self-evident eh?
+            n: trace cutoff in steps
+
+        Returns:
+            V: State value function
+        """
+        for i in range(num_episodes):
+            if (i+1) % 1000 == 0:
+                print(f"\rEpisode {i+1}/{num_episodes}")
+
+            E = defaultdict(float)
+            visit_t = {}
+            episode = generate_episode()
+
+            for t, (state, action, reward, next_state, done) in enumerate(episode):
+                if done:
+                    td_target = reward
+                else:
+                    td_target = reward + self.gamma * self.V[next_state]
+                td_delta = td_target - self.V[state]
+
+                E[state] += 1.0
+                visit_t[state] = t
+
+                for s in E:
+                    self.V[s] += self.alpha * td_delta * E[s]
+                    E[s] *= self.gamma
+                    if (t - visit_t[s]) >= n:
+                        E[s] = 0.0
+
+        return self.V
+
     def get_value(self, state: int) -> float:
         return self.V[state]
