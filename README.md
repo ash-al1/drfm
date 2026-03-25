@@ -1,34 +1,51 @@
-# DRFM
+# Reinforcement Learning & DRFM
 
-**Work in progress!**
+<table align="center">
+    <tr>
+        <td>
+            <img src="media/bae.png" height="200px" />
+        </td>
+        <td>
+            <img src="media/draw.png" height="200px" />
+        </td>
+    </tr>
+</table>
 
-## What?
+This project aims to create a realistic Digital Radio Frequency Memory module
+embedded on a drone that operates using Reinforcement Learning algorithms, the
+drone itself also maneuvers using an algorithm tasked with surviving Radar
+tracking. Maneuverability is based on [^4] which is based off the research paper
+[^1]. Drone is used to survive some electromagnetic environment with
+deterministic radars that attempt to gain a lock, the DRFM module is trained to
+survive using realistic jamming techniques: transponder and repeater false
+targeting, combination of RGPO and VGPO, and SAR active decoy.
 
-Digital Radio Frequency Memory (DRFM) with Reinforcement Learning (RL). The goal
-of this project is to implement a DRFM with RL agents in the midst of an
-electromagnetic environment. The goal is to have some form of moving object
-(drone or not) that can maneuver terrain and given RADAR jammers located at some
-position its aim is to use its self-protection DRFM module to continue normal
-operations and achieve its goal.
+## DRFM Action Space
 
-The assumption is there will other 'players' or agents in the environment that
-aim to destroy the moving object. Another assumption is the usage of the Radio
-Frequency (RF) environment for task completion.
-
-Note this idea is not completely fleshed out; ideally I build something in real
-life alongside the simulation results otherwise working only with simulations
-will get boring quick. Isaac sim will be used for robotics for early simulation,
-the foundation environment may change depending on how difficult it is to embed
-RF components into the environment to maybe something like
-[Sionna](https://developer.nvidia.com/sionna).
-
---------
-
-## DRFM Module
-
-| Circuit | Block Diagram |
-|:---:|:---:|
-| ![Circuit](media/asd.png) | ![Block Diagram](media/draw.png) |
+<table align="center">
+    <tr>
+        <td>
+            <img src="media/transponder.gif" height="200px" />
+        </td>
+        <td>
+            <img src="media/repeater.gif" height="200px" />
+        </td>
+        <td>
+            <img src="media/rgpo.gif" height="200px" />
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <img src="media/vgpo.gif" height="200px" />
+        </td>
+        <td>
+            <img src="media/rgpo+vgpo.gif" height="200px" />
+        </td>
+        <td>
+            <img src="media/sarmap.gif" height="200px" />
+        </td>
+    </tr>
+</table>
 
 ## Setup
 
@@ -41,58 +58,50 @@ export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.
 ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 
---------
-
 ## Project Organization
 
 ```
 ├── LICENSE
-├── meta.md
 ├── README.md
-├── data
-│   ├── external
-│   ├── interim
-│   ├── processed
-│   └── raw
-|
-├── docs
-├── media
-├── models
-├── reports
-│   ├── figures
-│   └── Media
-|
-├── environment.yaml
-└── drfm
-    ├── __init__.py
-    ├── main.py
-    ├── agent.py
-    ├── discrete.py
-    └── libs
-        ├── libmdp.py       <- Markov Decision Process (Value+Policy iteration) 
-        ├── libsparse.py    <- MDP Sparse
-        ├── libql.py        <- Q-learning
-        ├── libtd.py        <- Temporal-difference
-        ├── libsarsa.py     <- SARSA
-        └── libmcarlo.py    <- Monte Carlo
+├── pyproject.toml
+│
+├── configs/
+├── docs/
+├── media/ 
+├── examples/
+├── scripts/
+│   ├── train.py
+│   └── play.py
+│
+├── drfm/
+│   ├── __init__.py
+│   ├── assets/
+│   ├── robots/
+│   ├── envs/
+│   │   ├── isaac/
+│   │   │   └── mdp/
+│   │   └── gym/
+│   ├── agents/
+│   ├── algorithms/
+│   ├── dynamics/
+│   └── utils/
 ```
 
---------
+## References
 
-# Citations
-+ Claude for programming
-+ Kaufmann, Elia, et al. "Champion-level drone racing using deep reinforcement learning." Nature 620.7976 (2023): 982-987.
-+ Reinforcement Learning Richard S. Sutton, Andrew G. Barto 2018
-+ Merrick, Russell. Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners. No Starch Press, 2023.
-+ [Radar equations](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
-+ [Radar Jamming and Deception](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
-+ [TD Learning](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
-+ Project structure used in repository [Cookiecutter](https://cookiecutter-data-science.drivendata.org)
-+ DRFM circuit figure \& general information [DRFM history, circuit & testing](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
-+ Cognitive radio/RF basics [NATO Cognitive Radio Technical Report](https://www.sic.rma.ac.be/~vlenir/publications/STO-TR-IST-077.pdf)
-+ Some DRFM mathematics [DRFM-Modulator For HRR-Jamming](https://web.archive.org/web/20110722014927/http://ftp.rta.nato.int/public//PubFullText/RTO/MP/RTO-MP-SET-080///MP-SET-080-P07.pdf)
-+ Bellman equations used for libmdp [Bellman eq](https://en.wikipedia.org/wiki/Bellman_equation#The_Bellman_equation)
-+ Optimality used for libmdp [Bellman optimality](https://en.wikipedia.org/wiki/Bellman_equation#Bellman's_principle_of_optimality)
-+ [Markov algorithms (value, policy iteration)](https://en.wikipedia.org/wiki/Markov_decision_process#Algorithms)
-+ Foundation model used [Isaac Sim: Foundation](https://github.com/isaac-sim/IsaacSim)
-+ RL environments [Isaac Lab: Environment](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
+[^1]: Kaufmann, E., et al. "Champion-level drone racing using deep reinforcement learning." *Nature* 620.7976 (2023): 982–987.
+[^2]: Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
+[^3]: Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
+[^4]: Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.
+[^5]: [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
+[^6]: [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
+[^7]: [Isaac Lab: RL Environments](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
+[^8]: [Radar Equations - MIT Lincoln Lab](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
+[^9]: [Radar Jamming and Deception - Wikipedia](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
+[^10]: [DRFM: History, Circuit & Testing - Rohde & Schwarz](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
+[^11]: [TD Learning - Stanford CME241](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
+[^12]: [Bellman Equation - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#The_Bellman_equation)
+[^13]: [Bellman's Principle of Optimality - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#Bellman's_principle_of_optimality)
+[^14]: [MDP Algorithms: Value & Policy Iteration - Wikipedia](https://en.wikipedia.org/wiki/Markov_decision_process#Algorithms)
+[^16]: [AN/ALE-55 Fiber-Optic Towed Decoy (FOTD) Image - BAE SYSTEMS](https://www.baesystems.com/en-us/product/anale55-fiberoptic-towed-decoy)
+[^15]: Claude (Anthropic)
