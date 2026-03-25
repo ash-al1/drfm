@@ -33,6 +33,8 @@ from datetime import datetime
 # Ensure this script's directory is resolved first so local utils/ isn't
 # shadowed by IsaacLab's utils package on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add repo root so drfm package is importable.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gymnasium as gym
 import skrl
@@ -131,7 +133,7 @@ from isaaclab_rl.skrl import SkrlVecEnvWrapper
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
 import isaaclab_tasks  # noqa: F401
-import environment  # noqa: F401
+import drfm.envs.isaac  # noqa: F401
 
 from skrl.utils.runner.torch import Runner
 
