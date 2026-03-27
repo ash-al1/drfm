@@ -179,6 +179,7 @@ class RewardsCfg:
     completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=1000.0, params={"command_name": "target"})
     terminating      = RewTerm(func=mdp.is_terminated,      weight=-1000.0)
     step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.01)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,        weight=-0.01)
     proximity        = RewTerm(
         func=mdp.proximity_penalty,
         weight=-1.0,

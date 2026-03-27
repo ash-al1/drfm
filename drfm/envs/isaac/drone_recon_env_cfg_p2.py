@@ -132,8 +132,10 @@ class RewardsCfgP2:
     heading          = RewTerm(func=mdp.heading_to_goal,    weight=2.0,     params={"command_name": "target"})
     arrived          = RewTerm(func=mdp.arrived,            weight=500.0,   params={"command_name": "target", "threshold": 1.0})
     completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=1000.0,  params={"command_name": "target"})
+    distance_penalty = RewTerm(func=mdp.distance_to_goal,   weight=-0.1,   params={"command_name": "target"})
     terminating      = RewTerm(func=mdp.is_terminated,      weight=-1000.0)
     step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.05)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,        weight=-0.01)
     proximity        = RewTerm(func=mdp.proximity_penalty,  weight=-1.0,
                                params={"obstacle_names": _OBSTACLE_NAMES, "safe_dist": 2.5, "max_dist": 6.0})
 

@@ -178,7 +178,7 @@ class DrfmActionCfg(ActionTermCfg):
     class_type: type[ActionTerm] = DrfmAction
     asset_name: str = "robot"
     radar_positions: tuple = (
-        ( 8.0,  0.0, 0.0),   # Search/Acq    - x∈[5,13]
-        (16.0, -6.0, 0.0),   # Pulse-Doppler - x∈[13,21]
-        (24.0,  5.0, 0.0),   # Monopulse     - x∈[21,28]
+        ( 7.0,  1.0, 0.0),
+        (25.0, -9.0, 0.0),
+        (26.0,  9.0, 0.0),
     )
