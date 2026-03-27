@@ -1,10 +1,5 @@
-# Copyright (c) 2025, Kousheek Chakraborty
-# All rights reserved.
 #
-# SPDX-License-Identifier: BSD-3-Clause
 #
-# This project uses the IsaacLab framework (https://github.com/isaac-sim/IsaacLab),
-# which is licensed under the BSD-3-Clause License.
 
 """
 File:   drone_recon_env_cfg.py
@@ -69,16 +64,16 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
 
     # --- Interior obstacles ---
     obstacle_box1: RigidObjectCfg = _box(
-        "{ENV_REGEX_NS}/ObstacleBox1", (2.0, 2.0, 5.0), (7.0,  2.5, 2.5), (0.6, 0.4, 0.2)
+        "{ENV_REGEX_NS}/ObstacleBox1", (2.0, 2.0, 5.0), (6.0,   8.0, 2.5), (0.6, 0.4, 0.2)
     )
     obstacle_box2: RigidObjectCfg = _box(
-        "{ENV_REGEX_NS}/ObstacleBox2", (2.0, 1.0, 4.0), (12.0, -3.5, 2.0), (0.5, 0.5, 0.65)
+        "{ENV_REGEX_NS}/ObstacleBox2", (2.0, 1.0, 4.0), (13.5, -8.0, 2.0), (0.5, 0.5, 0.65)
     )
     obstacle_box3: RigidObjectCfg = _box(
-        "{ENV_REGEX_NS}/ObstacleBox3", (3.0, 3.0, 7.0), (18.0,  3.5, 3.5), (0.55, 0.5, 0.35)
+        "{ENV_REGEX_NS}/ObstacleBox3", (3.0, 3.0, 7.0), (22.0,  8.0, 3.5), (0.55, 0.5, 0.35)
     )
     obstacle_box4: RigidObjectCfg = _box(
-        "{ENV_REGEX_NS}/ObstacleBox4", (1.0, 4.0, 3.0), (10.0, -1.0, 1.5), (0.4, 0.55, 0.4)
+        "{ENV_REGEX_NS}/ObstacleBox4", (1.0, 4.0, 3.0), (27.0, -5.0, 1.5), (0.4, 0.55, 0.4)
     )
 
     # --- Boundary walls (grey) ---
@@ -156,7 +151,7 @@ class EventCfg:
         mode="reset",
         params={
             "pose_range": {
-                "x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.5, 1.5),
+                "x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.5, 0.5),
                 "roll": (-0.1, 0.1), "pitch": (-0.1, 0.1), "yaw": (-3.14159, 3.14159),
             },
             "velocity_range": {
@@ -188,7 +183,7 @@ class TerminationsCfg:
     reached_goal = DoneTerm(func=mdp.reached_goal,     params={"command_name": "target", "threshold": 2.5})
     collision    = DoneTerm(func=mdp.illegal_contact,   params={"sensor_cfg": SceneEntityCfg("collision_sensor"), "threshold": 0.01})
     flyaway      = DoneTerm(func=mdp.flyaway,           params={"command_name": "target", "distance": 50.0})
-    too_high     = DoneTerm(func=mdp.too_high,          params={"max_z": 8.0})
+    too_high     = DoneTerm(func=mdp.too_high,          params={"max_z": 4.0})
 
 
 @configclass

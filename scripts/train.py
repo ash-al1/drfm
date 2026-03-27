@@ -1,9 +1,6 @@
-# Copyright (c) 2025, Kousheek Chakraborty
-# All rights reserved.
 #
-# SPDX-License-Identifier: BSD-3-Clause
 #
-# Usage: python3 scripts/train.py --task Isaac-Drone-Racer-v0 --headless --num_envs 4096
+# Usage: python3 scripts/train.py --task Isaac-Drone-Recon-v0 --headless --num_envs 4096
 
 import argparse
 import glob
@@ -36,9 +33,9 @@ parser.add_argument("--distributed", action="store_true", default=False)
 parser.add_argument("--checkpoint", type=str, default=None)
 parser.add_argument("--max_iterations", type=int, default=None)
 parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO"])
-parser.add_argument("--phase", type=int, default=None)
+parser.add_argument("--phase", type=int, required=True)
 parser.add_argument("--wandb", action="store_true", default=False)
-parser.add_argument("--wandb_project", type=str, default="drone-racer")
+parser.add_argument("--wandb_project", type=str, default="drone-recon")
 
 from isaaclab.app import AppLauncher
 
@@ -65,7 +62,6 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 import isaaclab_tasks  # noqa: F401
 import drfm.envs.isaac  # noqa: F401
 
-from skrl.utils.runner.torch import Runner
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
 from skrl.memories.torch import RandomMemory
 from skrl.resources.preprocessors.torch import RunningStandardScaler
@@ -198,7 +194,7 @@ def _task_slug(task: str, phase: int | None) -> str:
     return f"{slug}_phase{phase}" if phase is not None else slug
 
 
-def _build_recon_agent(env, agent_cfg):
+def _build_agent(env, agent_cfg):
     a = agent_cfg["agent"]
     m = agent_cfg["models"]
     hidden_sizes = tuple(m["policy"]["network"][0]["layers"])
@@ -335,111 +331,97 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
-    if "Recon" in args_cli.task:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        slug = _task_slug(args_cli.task, args_cli.phase)
-        run_name = f"{algorithm}_{slug}_{ts}"
-        run_dir = os.path.join("models", "checkpoints", run_name)
-        os.makedirs(run_dir, exist_ok=True)
-        os.makedirs(os.path.join("models", "configs"), exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    slug = _task_slug(args_cli.task, args_cli.phase)
+    run_name = f"{algorithm}_{slug}_{ts}"
+    run_dir = os.path.join("models", "checkpoints", run_name)
+    os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(os.path.join("models", "configs"), exist_ok=True)
 
-        _agent_ref = [None]
-        stats_wrapper = EpisodeStatsWrapper(
-            env, print_every=1000, run_dir=run_dir, agent_ref=_agent_ref,
-            total_timesteps=agent_cfg["trainer"]["timesteps"],
-        )
-        env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
+    _agent_ref = [None]
+    stats_wrapper = EpisodeStatsWrapper(
+        env, print_every=1000, run_dir=run_dir, agent_ref=_agent_ref,
+        total_timesteps=agent_cfg["trainer"]["timesteps"],
+    )
+    env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
 
-        m_cfg = agent_cfg["models"]["policy"]["network"][0]
-        hp = {
-            "algorithm":       args_cli.algorithm.upper(),
-            "task":            slug,
-            "timestamp":       datetime.now().isoformat(timespec="seconds"),
-            "architecture":    "mlp_actor_critic",
-            "observation_dim": env.observation_space.shape[0],
-            "action_dim":      env.action_space.shape[0],
-            "hidden_sizes":    list(m_cfg["layers"]),
-            "activation":      m_cfg["activations"],
-            "learning_rate":   agent_cfg["agent"]["learning_rate"],
-            "clip_ratio":      agent_cfg["agent"]["ratio_clip"],
-            "entropy_coef":    agent_cfg["agent"]["entropy_loss_scale"],
-            "gamma":           agent_cfg["agent"]["discount_factor"],
-            "gae_lambda":      agent_cfg["agent"]["lambda"],
-            "mini_batches":    agent_cfg["agent"]["mini_batches"],
-            "epochs":          agent_cfg["agent"]["learning_epochs"],
-            "max_grad_norm":   agent_cfg["agent"]["grad_norm_clip"],
-            "num_envs":        env_cfg.scene.num_envs,
-            "rollout_steps":   agent_cfg["agent"]["rollouts"],
-            "total_timesteps": agent_cfg["trainer"]["timesteps"],
-            "w_progress":      env_cfg.rewards.progress.weight,
-            "w_arrived":       env_cfg.rewards.arrived.weight,
-            "w_terminating":   env_cfg.rewards.terminating.weight,
-            "w_step_penalty":  env_cfg.rewards.step_penalty.weight,
-            "w_ang_vel_l2":    env_cfg.rewards.ang_vel_l2.weight,
-            "w_proximity":     env_cfg.rewards.proximity.weight,
-            "w_heading":       env_cfg.rewards.heading.weight,
-            "terrain":         "flat",
-            "obstacles":       True,
-            "radars":          False,
-        }
-        yaml_str = yaml.dump(hp, default_flow_style=False, sort_keys=False)
-        for dest in [os.path.join(run_dir, "config.yaml"), os.path.join("models", "configs", f"{run_name}.yaml")]:
-            with open(dest, "w") as f:
-                f.write(yaml_str)
-        print(f"[INFO] Config written to: {run_dir}/config.yaml")
+    m_cfg = agent_cfg["models"]["policy"]["network"][0]
+    hp = {
+        "algorithm":       args_cli.algorithm.upper(),
+        "task":            slug,
+        "timestamp":       datetime.now().isoformat(timespec="seconds"),
+        "architecture":    "mlp_actor_critic",
+        "observation_dim": env.observation_space.shape[0],
+        "action_dim":      env.action_space.shape[0],
+        "hidden_sizes":    list(m_cfg["layers"]),
+        "activation":      m_cfg["activations"],
+        "learning_rate":   agent_cfg["agent"]["learning_rate"],
+        "clip_ratio":      agent_cfg["agent"]["ratio_clip"],
+        "entropy_coef":    agent_cfg["agent"]["entropy_loss_scale"],
+        "gamma":           agent_cfg["agent"]["discount_factor"],
+        "gae_lambda":      agent_cfg["agent"]["lambda"],
+        "mini_batches":    agent_cfg["agent"]["mini_batches"],
+        "epochs":          agent_cfg["agent"]["learning_epochs"],
+        "max_grad_norm":   agent_cfg["agent"]["grad_norm_clip"],
+        "num_envs":        env_cfg.scene.num_envs,
+        "rollout_steps":   agent_cfg["agent"]["rollouts"],
+        "total_timesteps": agent_cfg["trainer"]["timesteps"],
+        "w_progress":      env_cfg.rewards.progress.weight,
+        "w_arrived":       env_cfg.rewards.arrived.weight,
+        "w_terminating":   env_cfg.rewards.terminating.weight,
+        "w_step_penalty":  env_cfg.rewards.step_penalty.weight,
+        "w_ang_vel_l2":    env_cfg.rewards.ang_vel_l2.weight,
+        "w_proximity":     env_cfg.rewards.proximity.weight,
+        "w_heading":       env_cfg.rewards.heading.weight,
+        "terrain":         "flat",
+        "obstacles":       True,
+        "radars":          False,
+    }
+    yaml_str = yaml.dump(hp, default_flow_style=False, sort_keys=False)
+    for dest in [os.path.join(run_dir, "config.yaml"), os.path.join("models", "configs", f"{run_name}.yaml")]:
+        with open(dest, "w") as f:
+            f.write(yaml_str)
+    print(f"[INFO] Config written to: {run_dir}/config.yaml")
 
-        agent = _build_recon_agent(env, agent_cfg)
-        _agent_ref[0] = agent
+    agent = _build_agent(env, agent_cfg)
+    _agent_ref[0] = agent
 
-        print(f"[DEBUG] Policy params: {sum(p.numel() for p in agent.policy.parameters()):,}")
-        print(f"[DEBUG] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
+    print(f"[DEBUG] Policy params: {sum(p.numel() for p in agent.policy.parameters()):,}")
+    print(f"[DEBUG] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
 
-        if resume_path:
-            print(f"[INFO] Resuming from: {resume_path}")
-            agent.load(resume_path)
+    if resume_path:
+        print(f"[INFO] Resuming from: {resume_path}")
+        agent.load(resume_path)
 
-        t0 = time.time()
-        SequentialTrainer(
-            cfg={
-                "timesteps": agent_cfg["trainer"]["timesteps"],
-                "environment_info": agent_cfg["trainer"].get("environment_info", "log"),
-                "close_environment_at_exit": False,
-            },
-            env=env,
-            agents=agent,
-        ).train()
+    t0 = time.time()
+    SequentialTrainer(
+        cfg={
+            "timesteps": agent_cfg["trainer"]["timesteps"],
+            "environment_info": agent_cfg["trainer"].get("environment_info", "log"),
+            "close_environment_at_exit": False,
+        },
+        env=env,
+        agents=agent,
+    ).train()
 
-        torch.save(agent.policy.state_dict(), os.path.join(run_dir, "actor_final.pt"))
-        torch.save(agent.value.state_dict(), os.path.join(run_dir, "critic_final.pt"))
-        agent.save(os.path.join(run_dir, "agent_final.pt"))
+    torch.save(agent.policy.state_dict(), os.path.join(run_dir, "actor_final.pt"))
+    torch.save(agent.value.state_dict(), os.path.join(run_dir, "critic_final.pt"))
+    agent.save(os.path.join(run_dir, "agent_final.pt"))
 
-        ep_rets = [r for r in stats_wrapper._ep_returns if isinstance(r, (int, float)) and r == r]
-        metrics = {
-            "best_episode_return":      stats_wrapper._best_return if stats_wrapper._best_return > -float("inf") else None,
-            "best_episode_return_step": stats_wrapper._best_step if stats_wrapper._best_return > -float("inf") else None,
-            "final_episode_return":     sum(ep_rets) / len(ep_rets) if ep_rets else None,
-            "success_rate":             None,
-            "total_training_steps":     agent_cfg["trainer"]["timesteps"],
-            "wall_time_seconds":        int(time.time() - t0),
-        }
-        with open(os.path.join(run_dir, "metrics.json"), "w") as f:
-            json.dump(metrics, f, indent=2)
+    ep_rets = [r for r in stats_wrapper._ep_returns if isinstance(r, (int, float)) and r == r]
+    metrics = {
+        "best_episode_return":      stats_wrapper._best_return if stats_wrapper._best_return > -float("inf") else None,
+        "best_episode_return_step": stats_wrapper._best_step if stats_wrapper._best_return > -float("inf") else None,
+        "final_episode_return":     sum(ep_rets) / len(ep_rets) if ep_rets else None,
+        "success_rate":             None,
+        "total_training_steps":     agent_cfg["trainer"]["timesteps"],
+        "wall_time_seconds":        int(time.time() - t0),
+    }
+    with open(os.path.join(run_dir, "metrics.json"), "w") as f:
+        json.dump(metrics, f, indent=2)
 
-        print(f"[INFO] Artifacts saved to: {run_dir}")
-        env.close()
-
-    else:
-        env = EpisodeStatsWrapper(env, print_every=2000)
-        env = SkrlVecEnvWrapper(env, ml_framework="torch")
-        runner = Runner(env, agent_cfg)
-
-        if resume_path:
-            print(f"[INFO] Resuming from: {resume_path}")
-            runner.agent.load(resume_path)
-
-        runner.run()
-        env.close()
-        plot_training_curves(log_dir)
+    print(f"[INFO] Artifacts saved to: {run_dir}")
+    env.close()
 
 
 if __name__ == "__main__":
