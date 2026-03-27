@@ -96,3 +96,86 @@ Question is how do we structure environment and radar + drone interaction?
     + Penalties and rewards:
         - urge to finish quick, urge to take best orientation/angles, penalize
           for risky decisions (too close to objects)
+
+
+## Radar & DRFM Interaction
+
+### Search/Acquisition Radar
+
+Simple, non-coherent, no Doppler processing. Measures range:
+```
+R_measured = c · t_echo / 2 # Range, t_echo is delay of strongest return
+
+# Effect of RGPO -> DRFM return is stronger than skin return, walk range gate
+Δt(step) = Δt(step-1) + (2 · pull_off_rate · dt) / c
+R_apparent = R_true + c · Δt / 2
+
+# When RGPO active and J/S > 1:
+# α is effeciveness rate
+gate_separation = |R_apparent - R_true| / gate_width
+capture_factor = clamp(gate_separation, 0, 1)
+tq -= α_rgpo · capture_factor · dt
+```
+
+VGPO does not affect this radar, no velocity gate, no Doppler processing.
+
+Sweep model: mechanical rotation, antenna beamwidth, scan period. Beam is on
+target for certain dwell time. Detection only on dwell timer, non otherwise.
+```
+tq -= bleed_rate · dt # bleed_rate ~ 0.02/s
+```
+
+### Pulse-Doppler Radar
+
+Measures range and radial velocity independently. Validates one against another.
+Range: `R_measured = c · t_echo / 2`, velocity from Doppler:
+```
+f_d = 2 · fc · v_radial / c
+v_measured = f_d · c / (2 · fc)
+```
+
+Why RGPO fails: `v_from_range = ΔR_measured / Δt_between_pulses`, then measure
+`consistency_error = |v_from_range - v_measured|`. Check consistency:
+```
+if consistency_error > consistency_threshold:
+    reject range measurement, hold last valid gate position
+    tq += α_detect · (1 - tq) · dt # tracking continues normally
+```
+
+What VGPO does - inject delta f, gate follows v_apparent consistency check now
+helps with deception.
+```
+Δf(step) = Δf(step-1) + (2 · velocity_pull_off_rate · dt) / λ
+v_apparent = v_true + Δf · λ / 2
+```
+
+What RVGPO does - more effective than VGPO, finds physically plausible
+trajectory both gates are pulled together
+```
+range_rate_from_delay = c · d(Δt)/dt / 2     # implied velocity from range pull
+velocity_from_shift = Δf · λ / 2             # implied velocity from Doppler pull
+coordination_error = |range_rate_from_delay - velocity_from_shift|
+pqf = 1 - clamp(coordination_error / max_allowed_error, 0, 1)
+```
+
+Sweep model: Dwell fraction typically high, no mechanical sweep, electronically
+steered beam dwells on target most of the time.
+
+### Monopulse Radar
+
+Measures angle error, range and velocity - 4 beams. `θ_error = Re(Δ / Σ)`.
+
+No gate to walk off, ratio is compute on every pulse. RVGPO degrades range and
+velocity enough that combined destabilizes.
+```
+# RVGPO effect on monopulse: indirect, through track filter destabilization
+range_vel_degradation = α_rvgpo_mono · pqf · combined_capture_factor · dt
+# But the angle channel provides a stabilizing correction:
+angle_stabilization = α_angle · (1 - θ_error_normalized) · dt
+# Net effect:
+tq -= (range_vel_degradation - angle_stabilization)
+```
+
+RGPO and VGPO alone has minimal if any effect.
+
+Sweep mode: Cued tracker, no sweep. Continuous dwell on target. Dwell = 1.0.
