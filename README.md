@@ -53,19 +53,39 @@ Environment is split into two phases: (1) navigation, (2) DRFM. This allows us
 to test different agents, architectures on invidiual problems. Later the agent
 will be packaged without any regards for which phase to use.
 
-Phase 1 - navigation:
+Navigation only: simple case of drone that navigates to three separate waypoints
+that are randomly placed within boundary walls.
 ```sh
 HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v0 --num_envs 4096 --phase 1
 
 python scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
 
-Phase 2 - navigation + radar + DRFM:
+Navigation and DRFM: three separate radars are present one for each action space
+above sparsely located to not interfere with each other. DRFM has no direct
+connection to rewards, this needs to be thought through better.
 ```sh
 HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v1 --num_envs 4096 --phase 2
 
 python scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
+
+## Justification
+
+We used Proximal Policy Optimazation (PPO) throughout the project and only added
+Soft Actor-Critic (SAC) later for ablation & replay buffer. Both these agents
+support hybrid discrete-continuous actions which is critical for the DRFM
+module, which supports 3 discrete actions: RGPO, VGPO, RVGPO - when one of these
+is selected each has continuous set based on its position w.r.t radar. PPO and
+SAC covers decent variance since one is on-policy and the other is off-policy.
+
+All other agents mentioned, DQN, REINFORCE, vanilla Actor-Critic, DDPG, TD3 and
+TRPO cannot be used for any of these reasons: discrete only, continuous only,
+higher variance. Also PPO is pretty popular compared to all the others ...
+
+For thought process in building the environment, how we structure separate
+navigation and DRFM, and jointly incorporate them take a look in
+./docs/thoughts.md. This file also includes some major issues we ran into.
 
 ## Setup
 
@@ -86,24 +106,24 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 ├── pyproject.toml
 │
 ├── configs/
-├── docs/
+├── docs/               # Thought process, task list, updates, research
 ├── media/ 
-├── examples/
-├── scripts/
+├── examples/           # Old tutorial for bookkeeping
+├── scripts/            # Main run files
 │   ├── train.py
 │   └── play.py
 │
 ├── drfm/
 │   ├── __init__.py
-│   ├── assets/
-│   ├── robots/
+│   ├── assets/         # Iris USD
+│   ├── robots/         # Drone file
 │   ├── envs/
-│   │   ├── isaac/
-│   │   │   └── mdp/
+│   │   ├── isaac/      # Drone recon cfg
+│   │   │   └── mdp/    # Actions, Observations, etc
 │   │   └── gym/
-│   ├── agents/
-│   ├── algorithms/
-│   ├── dynamics/
+│   ├── agents/         # Skrl hyperparameters
+│   ├── algorithms/     # Classic RL algos
+│   ├── dynamics/       # Drone dynamics (Isaac drone racer)
 │   └── utils/
 ```
 

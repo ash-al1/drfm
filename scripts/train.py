@@ -32,7 +32,7 @@ parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--distributed", action="store_true", default=False)
 parser.add_argument("--checkpoint", type=str, default=None)
 parser.add_argument("--max_iterations", type=int, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO", "SAC"])
 parser.add_argument("--phase", type=int, required=True)
 parser.add_argument("--wandb", action="store_true", default=False)
 parser.add_argument("--wandb_project", type=str, default="drone-recon")
@@ -63,11 +63,13 @@ import isaaclab_tasks  # noqa: F401
 import drfm.envs.isaac  # noqa: F401
 
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
+from skrl.agents.torch.sac import SAC, SAC_DEFAULT_CONFIG
 from skrl.memories.torch import RandomMemory
 from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveLR
 from skrl.trainers.torch import SequentialTrainer
-from models.architectures.mlp_actor_critic import MLPActor, MLPCritic
+from models.architectures.mlp_actor_critic import MLPActor, MLPCritic, MLPSACCritic
+from models.replay_buffers import ReplayBuffer
 
 
 class LoggedPPO(PPO):
@@ -89,6 +91,18 @@ class LoggedPPO(PPO):
     def _update(self, timestep, timesteps):
         self._update_count += 1
         PPO._update(self, timestep, timesteps)
+        self.last_metrics = {k: list(v) for k, v in self.tracking_data.items()}
+
+
+class LoggedSAC(SAC):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_metrics = {}
+        self._update_count = 0
+
+    def _update(self, timestep, timesteps):
+        self._update_count += 1
+        SAC._update(self, timestep, timesteps)
         self.last_metrics = {k: list(v) for k, v in self.tracking_data.items()}
 
 
@@ -207,22 +221,19 @@ class EpisodeStatsWrapper(gym.Wrapper):
                         vals = m.get(key, [])
                         return sum(vals) / len(vals) if vals else 0.0
 
-                    pi_loss = _avg("Loss / Policy loss")
-                    v_loss = _avg("Loss / Value loss")
-                    entropy = _avg("Loss / Entropy loss")
+                    losses = {k.split("Loss / ")[-1]: _avg(k) for k in m if k.startswith("Loss / ")}
                     lr_key = [k for k in m if "Learning rate" in k]
                     lr = _avg(lr_key[0]) if lr_key else 0.0
-                    print(
-                        f"   losses  pi={pi_loss:.4f}  v={v_loss:.4f}  "
-                        f"ent={entropy:.4f}  lr={lr:.2e}  updates={updates}"
-                    )
+                    loss_str = "  ".join(f"{k}={v:.4f}" for k, v in losses.items())
+                    print(f"   losses  {loss_str}  lr={lr:.2e}  updates={updates}")
 
             if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
                 self._best_return = mean_r
                 self._best_step = self._step
                 agent = self._agent_ref[0]
                 torch.save(agent.policy.state_dict(), os.path.join(self._run_dir, "actor.pt"))
-                torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
+                if hasattr(agent, "value"):
+                    torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
                 agent.save(os.path.join(self._run_dir, "agent_best.pt"))
                 print(f"   >>> NEW BEST  {mean_r:+.1f}  @ step {self._step:,}  - checkpoint saved")
 
@@ -295,6 +306,66 @@ def _build_agent(env, agent_cfg):
         cfg["rewards_shaper"] = lambda rewards, *args, **kwargs: rewards * scale
 
     return LoggedPPO(
+        models=models, memory=memory, cfg=cfg,
+        observation_space=env.observation_space,
+        action_space=env.action_space,
+        device=env.device,
+    )
+
+
+def _build_sac_agent(env, agent_cfg):
+    a = agent_cfg["agent"]
+    m = agent_cfg["models"]
+    hidden_sizes = tuple(m["policy"]["network"][0]["layers"])
+    activation = m["policy"]["network"][0]["activations"]
+
+    critic_kwargs = dict(
+        hidden_sizes=hidden_sizes, activation=activation,
+        clip_actions=m["critic"].get("clip_actions", False),
+    )
+    models = {
+        "policy": MLPActor(
+            env.observation_space, env.action_space, env.device,
+            hidden_sizes=hidden_sizes, activation=activation,
+            clip_actions=m["policy"].get("clip_actions", False),
+            clip_log_std=m["policy"].get("clip_log_std", True),
+            min_log_std=m["policy"].get("min_log_std", -20.0),
+            max_log_std=m["policy"].get("max_log_std", 2.0),
+        ),
+        "critic_1":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "critic_2":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "target_critic_1": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "target_critic_2": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+    }
+
+    memory = ReplayBuffer(capacity=a["memory_size"], num_envs=env.num_envs, device=env.device)
+
+    cfg = SAC_DEFAULT_CONFIG.copy()
+    cfg.update({
+        "gradient_steps":          a.get("gradient_steps", 1),
+        "batch_size":              a["batch_size"],
+        "discount_factor":         a["discount_factor"],
+        "polyak":                  a.get("polyak", 0.005),
+        "actor_learning_rate":     a["actor_learning_rate"],
+        "critic_learning_rate":    a["critic_learning_rate"],
+        "entropy_learning_rate":   a["entropy_learning_rate"],
+        "initial_entropy_value":   a.get("initial_entropy_value", 0.2),
+        "target_entropy":          a.get("target_entropy", None),
+        "learn_entropy":           a.get("learn_entropy", True),
+        "state_preprocessor":      RunningStandardScaler,
+        "state_preprocessor_kwargs": {"size": env.observation_space, "device": env.device},
+        "random_timesteps":        a.get("random_timesteps", 0),
+        "learning_starts":         a.get("learning_starts", 0),
+        "grad_norm_clip":          a.get("grad_norm_clip", 0),
+        "experiment": {
+            "directory":           a["experiment"]["directory"],
+            "experiment_name":     a["experiment"]["experiment_name"],
+            "write_interval":      1000,
+            "checkpoint_interval": a["experiment"].get("checkpoint_interval", 0),
+        },
+    })
+
+    return LoggedSAC(
         models=models, memory=memory, cfg=cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,
@@ -394,6 +465,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
 
     m_cfg = agent_cfg["models"]["policy"]["network"][0]
+    a_cfg = agent_cfg["agent"]
+    if algorithm == "sac":
+        algo_hp = {
+            "actor_learning_rate":   a_cfg["actor_learning_rate"],
+            "critic_learning_rate":  a_cfg["critic_learning_rate"],
+            "entropy_learning_rate": a_cfg["entropy_learning_rate"],
+            "batch_size":            a_cfg["batch_size"],
+            "memory_size":           a_cfg["memory_size"],
+            "polyak":                a_cfg.get("polyak", 0.005),
+        }
+    else:
+        algo_hp = {
+            "learning_rate": a_cfg["learning_rate"],
+            "clip_ratio":    a_cfg["ratio_clip"],
+            "entropy_coef":  a_cfg["entropy_loss_scale"],
+            "gae_lambda":    a_cfg["lambda"],
+            "mini_batches":  a_cfg["mini_batches"],
+            "epochs":        a_cfg["learning_epochs"],
+            "rollout_steps": a_cfg["rollouts"],
+        }
     hp = {
         "algorithm":       args_cli.algorithm.upper(),
         "task":            slug,
@@ -403,17 +494,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "action_dim":      env.action_space.shape[0],
         "hidden_sizes":    list(m_cfg["layers"]),
         "activation":      m_cfg["activations"],
-        "learning_rate":   agent_cfg["agent"]["learning_rate"],
-        "clip_ratio":      agent_cfg["agent"]["ratio_clip"],
-        "entropy_coef":    agent_cfg["agent"]["entropy_loss_scale"],
-        "gamma":           agent_cfg["agent"]["discount_factor"],
-        "gae_lambda":      agent_cfg["agent"]["lambda"],
-        "mini_batches":    agent_cfg["agent"]["mini_batches"],
-        "epochs":          agent_cfg["agent"]["learning_epochs"],
-        "max_grad_norm":   agent_cfg["agent"]["grad_norm_clip"],
+        "gamma":           a_cfg["discount_factor"],
+        "max_grad_norm":   a_cfg["grad_norm_clip"],
         "num_envs":        env_cfg.scene.num_envs,
-        "rollout_steps":   agent_cfg["agent"]["rollouts"],
         "total_timesteps": agent_cfg["trainer"]["timesteps"],
+        **algo_hp,
         "waypoints_per_episode": env_cfg.commands.target.waypoints_per_episode,
         "w_progress":         env_cfg.rewards.progress.weight,
         "w_heading":          env_cfg.rewards.heading.weight,
@@ -444,11 +529,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             f.write(yaml_str)
     print(f"[INFO] Config written to: {run_dir}/config.yaml")
 
-    agent = _build_agent(env, agent_cfg)
+    if algorithm == "sac":
+        agent = _build_sac_agent(env, agent_cfg)
+    else:
+        agent = _build_agent(env, agent_cfg)
     _agent_ref[0] = agent
 
     print(f"[INFO] Policy params: {sum(p.numel() for p in agent.policy.parameters()):,}")
-    print(f"[INFO] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
+    if hasattr(agent, "value"):
+        print(f"[INFO] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
     print(f"[INFO] obs_space: {env.observation_space}")
     print(f"[INFO] act_space: {env.action_space}")
 
@@ -468,7 +557,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     ).train()
 
     torch.save(agent.policy.state_dict(), os.path.join(run_dir, "actor_final.pt"))
-    torch.save(agent.value.state_dict(), os.path.join(run_dir, "critic_final.pt"))
+    if hasattr(agent, "value"):
+        torch.save(agent.value.state_dict(), os.path.join(run_dir, "critic_final.pt"))
     agent.save(os.path.join(run_dir, "agent_final.pt"))
 
     ep_rets = [r for r in stats_wrapper._ep_returns if isinstance(r, (int, float)) and r == r]

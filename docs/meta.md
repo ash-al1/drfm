@@ -1,20 +1,9 @@
 ---                                                                                 
 
 # Tasks:                                                                            
-+ Create discrete state space for training Drone movement, maybe DRFM too
-    + Populate this state space many times on the entire world to parallelize
-+ Change isaac drone racer -> drone navigation
-    + Give it GPS, some sensors to look at the environment, change reward
-    + Run a couple different models, get checkpoints, replay buffers
-+ Implement radar and drop 1 radar in discrete state space
-+ Implement DRFM, create unit tests for validation
-+ Run drone+drfm training on discrete state space with many models
-    + Get checkpoints, replay buffers, experience etc
 + Create visualization functions for this (saliency or something else)
-
----
-
-# Read
++ Ablation with NNs
++ Try SAC, TRPO - something with replay buffer
 
 ---
 
@@ -83,6 +72,16 @@
 ---
 
 # Done:
++ DRFM
+    + Still work in progress, power consumption, delays need tuning
+    + Each radar is weak against some DRFM and not others
++ Radar
+    + Search/Acquisition radar/Pulse Doppler/Monopulse simulations
+    + View mod_radar_types and thoughts.md
++ Drone navigation within bounded region, with sparse objects
+    + Waypoints/goals are gold disks drone has to go to
+    + Rewards and penalties to urge fast completion, prevent hover, dying and
+      collision with objects - still needs additional work
 + Defined DRFM action space as [Off, RGPO, VGPO, RVGPO]
     - Discrete action space, continuous parameter selection per technique
     - PPO with discrete head, continuous head per technique for parameters

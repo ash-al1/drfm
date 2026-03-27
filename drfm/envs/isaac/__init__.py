@@ -12,6 +12,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.drone_recon_env_cfg:DroneReconEnvCfg",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_cfg.yaml",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
     },
 )
 
@@ -22,6 +23,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.drone_recon_env_cfg:DroneReconEnvCfg_PLAY",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_cfg.yaml",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
     },
 )
 
@@ -36,6 +38,7 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.drone_recon_env_cfg_p2:DroneReconEnvCfgP2",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_cfg.yaml",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
     },
 )
 
@@ -46,5 +49,6 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.drone_recon_env_cfg_p2:DroneReconEnvCfgP2_PLAY",
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_cfg.yaml",
+        "skrl_sac_cfg_entry_point": f"{agents.__name__}:skrl_sac_cfg.yaml",
     },
 )

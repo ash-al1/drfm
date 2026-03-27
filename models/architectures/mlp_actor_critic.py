@@ -90,3 +90,16 @@ class MLPCritic(DeterministicMixin, Model):
 
     def compute(self, inputs, role):
         return self.net(inputs["states"]), {}
+
+
+class MLPSACCritic(DeterministicMixin, Model):
+    def __init__(self, observation_space, action_space, device,
+                 hidden_sizes=(256, 256, 256), activation="elu", clip_actions=False):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+        input_dim = self.observation_space.shape[0] + self.action_space.shape[0]
+        self.net = _build_mlp(input_dim, 1, hidden_sizes, activation, layer_norm=True)
+
+    def compute(self, inputs, role):
+        x = torch.cat([inputs["states"], inputs["taken_actions"]], dim=-1)
+        return self.net(x), {}

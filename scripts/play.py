@@ -22,7 +22,7 @@ parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--num_envs", type=int, default=None)
 parser.add_argument("--task", type=str, default=None)
 parser.add_argument("--checkpoint", type=str, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO", "SAC"])
 parser.add_argument("--real-time", action="store_true", default=False)
 parser.add_argument("--renderer", type=str, default="RayTracedLighting", choices=["RayTracedLighting", "PathTracing"])
 parser.add_argument("--log", type=int, default=None)
@@ -52,9 +52,10 @@ import drfm.envs.isaac  # noqa: F401
 from utils.logger import CSVLogger
 
 from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
+from skrl.agents.torch.sac import SAC, SAC_DEFAULT_CONFIG
 from skrl.memories.torch import RandomMemory
 from skrl.resources.preprocessors.torch import RunningStandardScaler
-from models.architectures.mlp_actor_critic import MLPActor, MLPCritic
+from models.architectures.mlp_actor_critic import MLPActor, MLPCritic, MLPSACCritic
 
 algorithm = args_cli.algorithm.lower()
 
@@ -100,6 +101,43 @@ def _build_agent(env, agent_cfg):
         "experiment": {"write_interval": 0, "checkpoint_interval": 0},
     })
     return PPO(
+        models=models, memory=memory, cfg=cfg,
+        observation_space=env.observation_space,
+        action_space=env.action_space,
+        device=env.device,
+    )
+
+
+def _build_sac_agent(env, agent_cfg):
+    m = agent_cfg["models"]
+    hidden_sizes = tuple(m["policy"]["network"][0]["layers"])
+    activation = m["policy"]["network"][0]["activations"]
+    critic_kwargs = dict(
+        hidden_sizes=hidden_sizes, activation=activation,
+        clip_actions=m["critic"].get("clip_actions", False),
+    )
+    models = {
+        "policy": MLPActor(
+            env.observation_space, env.action_space, env.device,
+            hidden_sizes=hidden_sizes, activation=activation,
+            clip_actions=m["policy"].get("clip_actions", False),
+            clip_log_std=m["policy"].get("clip_log_std", True),
+            min_log_std=m["policy"].get("min_log_std", -20.0),
+            max_log_std=m["policy"].get("max_log_std", 2.0),
+        ),
+        "critic_1":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "critic_2":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "target_critic_1": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+        "target_critic_2": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
+    }
+    memory = RandomMemory(memory_size=1, num_envs=env.num_envs, device=env.device)
+    cfg = SAC_DEFAULT_CONFIG.copy()
+    cfg.update({
+        "state_preprocessor":        RunningStandardScaler,
+        "state_preprocessor_kwargs": {"size": env.observation_space, "device": env.device},
+        "experiment": {"write_interval": 0, "checkpoint_interval": 0},
+    })
+    return SAC(
         models=models, memory=memory, cfg=cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,
@@ -167,7 +205,10 @@ def main() -> None:
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     env = SkrlVecEnvWrapper(env, ml_framework="torch")
-    agent = _build_agent(env, experiment_cfg)
+    if algorithm == "sac":
+        agent = _build_sac_agent(env, experiment_cfg)
+    else:
+        agent = _build_agent(env, experiment_cfg)
 
     if resume_path:
         print(f"[INFO] Loading checkpoint: {resume_path}")
