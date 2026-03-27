@@ -214,14 +214,16 @@ def main() -> None:
             ep_steps += 1
 
             if args_cli.debug:
-                # Use pre-step obs for nav — post-step obs may already be reset.
                 target_b  = _pre_obs[:3]
                 wp_rem    = int(round(_pre_obs[3].item() * wp_total))
                 quat      = _pre_obs[4:8]
                 lin_vel   = _pre_obs[8:11]
+                ang_vel   = _pre_obs[11:14]
                 _, _, yaw = _quat_to_euler_deg(quat.tolist())
                 dist      = torch.norm(target_b).item()
                 spd       = torch.norm(lin_vel).item()
+                angv      = torch.norm(ang_vel).item()
+                alt       = _pre_pos[2].item()
                 phase2    = _pre_obs.shape[0] >= 62
 
                 if torch.isnan(_pre_obs).any().item():
@@ -230,8 +232,8 @@ def main() -> None:
                 if ep_steps <= 3 or ep_steps % 100 == 0:
                     print(
                         f"[ep={num_episode}  s={ep_steps:4d}]  "
-                        f"dist={dist:5.1f}m  wp={wp_rem}/{wp_total}  "
-                        f"yaw={yaw:+6.1f}  spd={spd:4.1f}m/s  rew={r:+7.2f}"
+                        f"alt={alt:4.1f}  dist={dist:5.1f}  wp={wp_rem}/{wp_total}  "
+                        f"yaw={yaw:+6.1f}  spd={spd:4.1f}  angv={angv:4.1f}  rew={r:+7.2f}"
                     )
 
                     if phase2:

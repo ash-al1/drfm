@@ -133,6 +133,7 @@ class RadarManager:
         jamming_on = (technique != 0).unsqueeze(1).expand(-1, 3)
         can_esm = jamming_on & (self.state == SEARCH) & ~self.esm_triggered & (R < ESM_RANGE)
         self.state         = torch.where(can_esm, torch.full_like(self.state, DETECT), self.state)
+        self.tq            = torch.where(can_esm, torch.full_like(self.tq, 0.1), self.tq)
         self.esm_triggered = self.esm_triggered | can_esm
 
         # Dwell roll
@@ -151,7 +152,8 @@ class RadarManager:
         search_to_det  = window_done & (self.scan_det_count >= 3)
         self.scan_total_count = torch.where(window_done, torch.zeros_like(self.scan_total_count), self.scan_total_count)
         self.scan_det_count   = torch.where(window_done, torch.zeros_like(self.scan_det_count),   self.scan_det_count)
-        self.state = torch.where(search_to_det, torch.full_like(self.state, DETECT), self.state)
+        self.state            = torch.where(search_to_det, torch.full_like(self.state, DETECT), self.state)
+        self.tq               = torch.where(search_to_det, torch.full_like(self.tq, 0.1), self.tq)
 
         # Consecutive miss tracking (for Detect→Search fallback)
         in_dt = (self.state == DETECT) | (self.state == TRACK)

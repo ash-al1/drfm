@@ -193,8 +193,8 @@ class EpisodeStatsWrapper(gym.Wrapper):
                 time_str = f"{_fmt_time(elapsed)} elapsed"
 
             print(
-                f"\n── train  {progress}  {fps:,.0f} fps  {time_str}\n"
-                f"   return  {mean_r:+.1f} ± {std_r:.1f}  "
+                f"\n-- train  {progress}  {fps:,.0f} fps  {time_str}\n"
+                f"   return  {mean_r:+.1f} +/- {std_r:.1f}  "
                 f"(min {min(rets):.0f}  max {max(rets):.0f})  "
                 f"n={n}  len={mean_len:.0f}  timeout={timeout_pct:.0f}%"
             )
@@ -426,6 +426,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "obstacles":       True,
         "radars":          args_cli.phase >= 2,
     }
+    try:
+        hp["w_forward_speed"] = env_cfg.rewards.forward_speed.weight
+    except AttributeError:
+        pass
+    try:
+        hp["w_distance_penalty"] = env_cfg.rewards.distance_penalty.weight
+    except AttributeError:
+        pass
+    try:
+        hp["w_ang_vel_l2"] = env_cfg.rewards.ang_vel_l2.weight
+    except AttributeError:
+        pass
     yaml_str = yaml.dump(hp, default_flow_style=False, sort_keys=False)
     for dest in [os.path.join(run_dir, "config.yaml"), os.path.join("models", "configs", f"{run_name}.yaml")]:
         with open(dest, "w") as f:
