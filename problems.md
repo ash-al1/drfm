@@ -6,6 +6,19 @@ Only best trained agent not all
 Pass type of model to train (done), PPO etc
 Pass type of neural network (not done) - all MLP right now
 
+Issues:
+    + PPO training has catastrophic forgetting R=+2 -> R=-5 permanently
+    + Whether to use training bootstrap hyperparameter or not
+        + This either caused poor training performance (not sure why), NaN
+          values (figured out action space was (-inf, inf) or was getting
+          overwritten in runtime - hardcoded this now
+
+
+Debug_viz helped solve problem:
+    + https://github.com/isaac-sim/IsaacLab/discussions/2516
+    + Probably spent ~5 hours trying to fix this s...
+    + Still don't know what problem is but its disappeared for now
+
 
 
 Problems:

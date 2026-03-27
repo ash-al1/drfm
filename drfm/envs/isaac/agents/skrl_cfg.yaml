@@ -38,5 +38,5 @@ agent:
     checkpoint_interval: 0
 
 trainer:
-  timesteps: 200000
+  timesteps: 25000
   environment_info: log
