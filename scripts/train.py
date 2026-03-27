@@ -447,20 +447,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         env, print_every=1000, run_dir=run_dir, agent_ref=_agent_ref,
         total_timesteps=agent_cfg["trainer"]["timesteps"],
     )
-    env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
 
     import gymnasium as _gym
     import numpy as _np
-    _act_dim = env.action_space.shape[-1]
-    env._env.unwrapped.action_space = _gym.spaces.Box(
-        low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32
-    )
-    env._env.unwrapped.single_action_space = _gym.spaces.Box(
-        low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32
-    )
-    env.action_space = _gym.vector.utils.batch_space(
-        env._env.unwrapped.single_action_space, env.num_envs
-    )
+    _act_dim = env.unwrapped.action_space.shape[-1]
+    env.unwrapped.action_space = _gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32)
+    env.unwrapped.single_action_space = _gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32)
+
+    env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
 
     m_cfg = agent_cfg["models"]["policy"]["network"][0]
     hp = {
