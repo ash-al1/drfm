@@ -124,8 +124,9 @@ class WaypointCommand(CommandTerm):
 
             advanced = arrived_mask & ~newly_done
             if advanced.any():
-                next_goals = self._waypoints[idx, self._waypoint_idx]
-                self._command[advanced, :3] = next_goals[advanced]
+                adv_idx = idx[advanced]
+                adv_wp = self._waypoint_idx[advanced]
+                self._command[advanced, :3] = self._waypoints[adv_idx, adv_wp]
                 self._command[advanced, 3:] = torch.tensor(
                     [0.0, 0.0, 0.0, 1.0], device=self.device
                 )
