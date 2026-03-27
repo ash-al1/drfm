@@ -76,6 +76,11 @@ class LoggedPPO(PPO):
         self.last_metrics = {}
         self._update_count = 0
 
+    def init(self, trainer_cfg=None):
+        super().init(trainer_cfg)
+        if self.memory is not None:
+            self._current_log_prob = torch.zeros(self.num_envs, 1, device=self.device)
+
     def _update(self, timestep, timesteps):
         self._update_count += 1
         PPO._update(self, timestep, timesteps)
