@@ -65,3 +65,16 @@ def waypoints_remaining(
     remaining = cmd.waypoints_remaining.unsqueeze(-1)
     total = cmd.cfg.waypoints_per_episode
     return remaining / max(total, 1)
+
+
+def rwr_observations(env: ManagerBasedRLEnv) -> torch.Tensor:
+    drfm = env.action_manager.get_term("drfm_action")
+    robot = env.scene["robot"]
+    return drfm.radar_manager.get_observations(
+        robot.data.root_pos_w - env.scene.env_origins,
+        robot.data.root_quat_w,
+    )
+
+
+def drfm_state_obs(env: ManagerBasedRLEnv) -> torch.Tensor:
+    return env.action_manager.get_term("drfm_action").get_state_obs()

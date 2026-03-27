@@ -187,8 +187,15 @@ def main() -> None:
     print(f"[INFO] Observation shape: {obs.shape}")
     print(f"[INFO] Episode length: {env_cfg.episode_length_s}s")
 
+    wp_total = env_cfg.commands.target.waypoints_per_episode
+
     while simulation_app.is_running():
         start_time = time.time()
+
+        # Save pre-step state — env auto-resets on terminal, wiping this info.
+        if args_cli.num_envs == 1:
+            _pre_obs     = obs[0].cpu().clone()
+            _pre_pos     = raw_env.scene["robot"].data.root_pos_w[0].cpu().clone()
 
         with torch.inference_mode():
             outputs = agent.act(obs, timestep=0, timesteps=0)
@@ -207,40 +214,62 @@ def main() -> None:
             ep_steps += 1
 
             if args_cli.debug:
-                a = actions[0].cpu()
-                target_b = o[:3]
-                wp_rem = o[3]
-                quat = o[4:8]
-                lin_vel = o[8:11]
-                ang_vel = o[11:14]
-                roll, pitch, yaw = _quat_to_euler_deg(quat.tolist())
-                target_dist = torch.norm(target_b).item()
+                # Use pre-step obs for nav — post-step obs may already be reset.
+                target_b  = _pre_obs[:3]
+                wp_rem    = int(round(_pre_obs[3].item() * wp_total))
+                quat      = _pre_obs[4:8]
+                lin_vel   = _pre_obs[8:11]
+                _, _, yaw = _quat_to_euler_deg(quat.tolist())
+                dist      = torch.norm(target_b).item()
+                spd       = torch.norm(lin_vel).item()
+                phase2    = _pre_obs.shape[0] >= 62
 
-                if torch.isnan(o).any().item():
-                    print(f"[DEBUG] *** NaN IN OBSERVATIONS at step {ep_steps} ***")
+                if torch.isnan(_pre_obs).any().item():
+                    print(f"[NaN  ep={num_episode}  s={ep_steps}]  *** NaN in observations ***")
 
-                if ep_steps <= 3 or t or tr or ep_steps % 100 == 0:
+                if ep_steps <= 3 or ep_steps % 100 == 0:
                     print(
-                        f"[ep={num_episode} step={ep_steps:4d}] "
-                        f"pos_body=({target_b[0]:+6.1f},{target_b[1]:+6.1f},{target_b[2]:+6.1f}) "
-                        f"wp_rem={wp_rem:.2f} "
-                        f"dist={target_dist:5.1f}  "
-                        f"rpy=({roll:+6.1f},{pitch:+6.1f},{yaw:+6.1f})  "
-                        f"vel=({lin_vel[0]:+5.1f},{lin_vel[1]:+5.1f},{lin_vel[2]:+5.1f})  "
-                        f"w=({ang_vel[0]:+5.1f},{ang_vel[1]:+5.1f},{ang_vel[2]:+5.1f})  "
-                        f"act=({a[0]:+5.2f},{a[1]:+5.2f},{a[2]:+5.2f},{a[3]:+5.2f})  "
-                        f"rew={r:+7.2f}"
+                        f"[ep={num_episode}  s={ep_steps:4d}]  "
+                        f"dist={dist:5.1f}m  wp={wp_rem}/{wp_total}  "
+                        f"yaw={yaw:+6.1f}  spd={spd:4.1f}m/s  rew={r:+7.2f}"
                     )
 
+                    if phase2:
+                        _RADAR = ["SAcq", "PD  ", "Mono"]
+                        _STATE = ["Search", "Detect", "Track ", "LOCK  "]
+                        _TECH  = ["OFF", "RGPO", "VGPO", "RVGPO"]
+                        radar_parts = []
+                        for i in range(3):
+                            b     = 14 + i * 10
+                            state = int(_pre_obs[b + 5 : b + 9].argmax().item())
+                            tq    = _pre_obs[b + 9].item()
+                            radar_parts.append(f"{_RADAR[i]}:{_STATE[state]} {tq:.2f}")
+                        tech      = int(_pre_obs[54:58].argmax().item())
+                        por       = _pre_obs[58].item() * 500
+                        vpor      = _pre_obs[59].item() * 200
+                        pwr       = _pre_obs[61].item()
+                        param_str = ""
+                        if tech == 1:
+                            param_str = f"  por={por:.0f}m/s"
+                        elif tech == 2:
+                            param_str = f"  vpor={vpor:.0f}m/s^2"
+                        elif tech == 3:
+                            param_str = f"  por={por:.0f}  vpor={vpor:.0f}"
+                        pwr_str = f"{pwr*100:.0f}%" if pwr > 0.0 else "DEPLETED"
+                        print(
+                            f"         radar  {'  |  '.join(radar_parts)}\n"
+                            f"         drfm   {_TECH[tech]}{param_str}  pwr={pwr_str}"
+                        )
+
             if t or tr:
-                robot = raw_env.scene["robot"]
-                world_pos = robot.data.root_pos_w[0].cpu()
-                wp_cmd = raw_env.command_manager.get_term("target")
+                # Use pre-step state — post-step is already the next episode.
+                wp_done = wp_total - int(round(_pre_obs[3].item() * wp_total))
+                outcome = "SUCCESS" if t and wp_done >= wp_total else ("KILLED" if t else "TIMEOUT")
                 print(
-                    f"[ep={num_episode:3d}] {('DONE' if t else 'TIMEOUT'):<6s}  "
+                    f"[ep={num_episode:3d}  {outcome}]  "
                     f"steps={ep_steps:4d}  return={ep_return:+8.2f}  "
-                    f"pos=({world_pos[0]:.1f},{world_pos[1]:.1f},{world_pos[2]:.1f})  "
-                    f"wp_visited={wp_cmd._waypoints_visited[0].item()}/{wp_cmd.cfg.waypoints_per_episode}"
+                    f"wp={wp_done}/{wp_total}  "
+                    f"pos=({_pre_pos[0]:.1f},{_pre_pos[1]:.1f},{_pre_pos[2]:.1f})"
                 )
 
         if terminated.any() or truncated.any():

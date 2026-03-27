@@ -103,6 +103,9 @@ class WaypointCommand(CommandTerm):
             c = center.to(pos.device)
             h = (half + margin).to(pos.device)
             clear &= ~(torch.abs(pos - c) < h).all(dim=1)
+        for (rx, ry, radius) in self.cfg.exclusion_zones:
+            dist_2d = torch.sqrt((pos[:, 0] - rx) ** 2 + (pos[:, 1] - ry) ** 2)
+            clear &= dist_2d >= radius
         return clear
 
     def _update_command(self):
@@ -166,6 +169,7 @@ class WaypointCommandCfg(CommandTermCfg):
     waypoints_per_episode: int = 5
     arrival_threshold: float = 2.5
     obstacle_margin: float = 2.0
+    exclusion_zones: tuple = ()   # ((x, y, radius), ...) - 2D circular no-spawn zones
 
     target_visualizer_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/ReconCommand/goal_ring",

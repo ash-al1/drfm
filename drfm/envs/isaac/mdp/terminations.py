@@ -49,3 +49,7 @@ def flyaway(
 
     distance_tensor = torch.linalg.norm(asset.data.root_pos_w - target_pos_tensor, dim=1)
     return distance_tensor > distance
+
+
+def radar_lock(env: ManagerBasedRLEnv) -> torch.Tensor:
+    return env.action_manager.get_term("drfm_action").radar_manager.any_locked

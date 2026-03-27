@@ -8,3 +8,5 @@ from .commands import *  # noqa: F401, F403
 from .observations import *  # noqa: F401, F403
 from .rewards import *  # noqa: F401, F403
 from .terminations import *  # noqa: F401, F403
+from .radar import *  # noqa: F401, F403
+from .drfm_action import *  # noqa: F401, F403

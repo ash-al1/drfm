@@ -186,17 +186,17 @@ class EpisodeStatsWrapper(gym.Wrapper):
             if self._total_timesteps:
                 pct = 100.0 * self._step / self._total_timesteps
                 eta = (self._total_timesteps - self._step) / max(fps, 1)
-                progress = f"{self._step:,}/{self._total_timesteps:,} ({pct:.1f}%)"
-                time_str = f"elapsed={_fmt_time(elapsed)}  eta={_fmt_time(eta)}"
+                progress = f"{self._step:,} / {self._total_timesteps:,}  ({pct:.1f}%)"
+                time_str = f"{_fmt_time(elapsed)} elapsed  eta {_fmt_time(eta)}"
             else:
-                progress = f"step={self._step:,}"
-                time_str = f"elapsed={_fmt_time(elapsed)}"
+                progress = f"step {self._step:,}"
+                time_str = f"{_fmt_time(elapsed)} elapsed"
 
             print(
-                f"[train] {progress}  fps={fps:,.0f}  {time_str}\n"
-                f"        ep={n}  R={mean_r:+.1f}\u00b1{std_r:.1f}  "
-                f"[{min(rets):.1f}, {max(rets):.1f}]  "
-                f"len={mean_len:.0f}  timeout={timeout_pct:.0f}%"
+                f"\n── train  {progress}  {fps:,.0f} fps  {time_str}\n"
+                f"   return  {mean_r:+.1f} ± {std_r:.1f}  "
+                f"(min {min(rets):.0f}  max {max(rets):.0f})  "
+                f"n={n}  len={mean_len:.0f}  timeout={timeout_pct:.0f}%"
             )
 
             if self._agent_ref and self._agent_ref[0] is not None:
@@ -213,9 +213,8 @@ class EpisodeStatsWrapper(gym.Wrapper):
                     lr_key = [k for k in m if "Learning rate" in k]
                     lr = _avg(lr_key[0]) if lr_key else 0.0
                     print(
-                        f"        updates={updates}\n"
-                        f"        pi_loss={pi_loss:.4f}  v_loss={v_loss:.4f}  "
-                        f"entropy={entropy:.4f}  lr={lr:.2e}"
+                        f"   losses  pi={pi_loss:.4f}  v={v_loss:.4f}  "
+                        f"ent={entropy:.4f}  lr={lr:.2e}  updates={updates}"
                     )
 
             if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
@@ -225,13 +224,14 @@ class EpisodeStatsWrapper(gym.Wrapper):
                 torch.save(agent.policy.state_dict(), os.path.join(self._run_dir, "actor.pt"))
                 torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
                 agent.save(os.path.join(self._run_dir, "agent_best.pt"))
-                print(f"        *** new best R={mean_r:+.1f} - checkpoint saved ***")
+                print(f"   >>> NEW BEST  {mean_r:+.1f}  @ step {self._step:,}  - checkpoint saved")
 
         return obs, rew, terminated, truncated, info
 
 
 def _task_slug(task: str, phase: int | None) -> str:
-    slug = task.lower().replace("isaac-drone-", "").replace("-v0", "").replace("-", "_")
+    import re
+    slug = re.sub(r"-v\d+$", "", task.lower().replace("isaac-drone-", "")).replace("-", "_")
     return f"{slug}_phase{phase}" if phase is not None else slug
 
 
@@ -424,7 +424,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "w_proximity":        env_cfg.rewards.proximity.weight,
         "terrain":         "flat",
         "obstacles":       True,
-        "radars":          False,
+        "radars":          args_cli.phase >= 2,
     }
     yaml_str = yaml.dump(hp, default_flow_style=False, sort_keys=False)
     for dest in [os.path.join(run_dir, "config.yaml"), os.path.join("models", "configs", f"{run_name}.yaml")]:

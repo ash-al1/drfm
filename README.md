@@ -45,13 +45,18 @@ Environment is split into two phases: (1) navigation, (2) DRFM. This allows us
 to test different agents, architectures on invidiual problems. Later the agent
 will be packaged without any regards for which phase to use.
 
-To run phase 1 for training and evaluating navigation:
+Phase 1 - navigation:
 ```sh
-# Train
-HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-Play-v0 --num_envs 4096 --phase 1 # Train
+HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v0 --num_envs 4096 --phase 1
 
-# Visualize
 python scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
+```
+
+Phase 2 - navigation + radar + DRFM:
+```sh
+HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v1 --num_envs 4096 --phase 2
+
+python scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
 
 

@@ -90,6 +90,24 @@ def step_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     return torch.ones(env.num_envs, device=env.device)
 
 
+def forward_speed(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    target_speed: float = 4.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward for the component of velocity aimed at the current waypoint.
+
+    Returns speed_toward_goal / target_speed, clamped to [0, 1].
+    Zero when hovering or moving away; peaks at target_speed.
+    """
+    asset = env.scene[asset_cfg.name]
+    goal  = env.command_manager.get_term(command_name).command[:, :3]
+    vec_to_goal = math_utils.normalize(goal - asset.data.root_pos_w)
+    speed_toward = (asset.data.root_lin_vel_w * vec_to_goal).sum(dim=1)
+    return (speed_toward / target_speed).clamp(0.0, 1.0)
+
+
 def distance_to_goal(
     env: ManagerBasedRLEnv,
     command_name: str,
