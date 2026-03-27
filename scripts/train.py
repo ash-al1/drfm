@@ -125,8 +125,10 @@ class LoggedPPO(PPO):
               f"values_nan={torch.isnan(values).any().item()} "
               f"rewards_nan={torch.isnan(rewards).any().item()} "
               f"log_probs_nan={torch.isnan(log_probs).any().item()} "
-              f"values_range=[{torch.nanmin(values).item():.4f}, {torch.nanmax(values).item():.4f}] "
-              f"rewards_range=[{torch.nanmin(rewards).item():.4f}, {torch.nanmax(rewards).item():.4f}]")
+              f"values_range=[{values[~torch.isnan(values)].min().item() if (~torch.isnan(values)).any() else 'NaN':.4f}, "
+              f"{values[~torch.isnan(values)].max().item() if (~torch.isnan(values)).any() else 'NaN':.4f}] "
+              f"rewards_range=[{rewards[~torch.isnan(rewards)].min().item() if (~torch.isnan(rewards)).any() else 'NaN':.4f}, "
+              f"{rewards[~torch.isnan(rewards)].max().item() if (~torch.isnan(rewards)).any() else 'NaN':.4f}]")
 
         orig_update = PPO._update
         def patched_update(self_ppo, *args, **kwargs):
@@ -446,6 +448,19 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         total_timesteps=agent_cfg["trainer"]["timesteps"],
     )
     env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
+
+    import gymnasium as _gym
+    import numpy as _np
+    _act_dim = env.action_space.shape[-1]
+    env._env.unwrapped.action_space = _gym.spaces.Box(
+        low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32
+    )
+    env._env.unwrapped.single_action_space = _gym.spaces.Box(
+        low=-1.0, high=1.0, shape=(_act_dim,), dtype=_np.float32
+    )
+    env.action_space = _gym.vector.utils.batch_space(
+        env._env.unwrapped.single_action_space, env.num_envs
+    )
 
     m_cfg = agent_cfg["models"]["policy"]["network"][0]
     hp = {
