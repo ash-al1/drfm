@@ -1,24 +1,10 @@
-"""
-File: Agent
-Use: RL Agent Wrapper
-Update: 
-"""
-
 import numpy as np
 from libs.libmdp import MDP
 from discrete import to_discrete
 
 
 class Agent:
-    def __init__(self, discreter: to_discrete, n_actions: int, gamma: float,
-                 epsilon: float = 0.1):
-        """
-        Args:
-            to_discrete: Map continuous outputs (isaac) -> discrete (mdp)
-            n_actions: Total number of actions
-            gamma: [0,1]
-            epsilon: Exploration rate
-        """
+    def __init__(self, discreter: to_discrete, n_actions: int, gamma: float, epsilon: float = 0.1):
         self.disc = discreter
         self.n_states = discreter.n_states
         self.n_actions = n_actions
@@ -42,13 +28,11 @@ class Agent:
         return self.disc.discretize_batch(obs_batch)
 
     def select_action(self, state: int) -> int:
-        """Epsilon-greedy action selection"""
         if np.random.random() < self.epsilon:
             return np.random.randint(self.n_actions)
         return int(np.argmax(self.policy[state]))
 
     def select_actions(self, states: np.ndarray) -> np.ndarray:
-        """Vectorized epsilon-greedy action selection for multiple states"""
         num_envs = len(states)
 
         greedy_actions = np.argmax(self.policy[states], axis=1)
@@ -65,13 +49,11 @@ class Agent:
 
     def update_model_batch(self, states: np.ndarray, actions: np.ndarray,
                            rewards: np.ndarray, next_states: np.ndarray):
-        """Vectorized update"""
         np.add.at(self.transition_counts, (states, actions, next_states), 1)
         np.add.at(self.reward_sum, (states, actions), rewards)
         np.add.at(self.reward_count, (states, actions), 1)
 
     def build_mdp(self) -> MDP:
-        """(Vectorized) Construct an MDP from accumulated experience"""
         totals = np.sum(self.transition_counts, axis=2)
         P = np.full((self.n_states, self.n_actions, self.n_states), 1.0 / self.n_states)
         np.divide(
@@ -91,18 +73,14 @@ class Agent:
 
         return MDP(P, R, self.gamma)
 
-    # Swap policy/value iteration
-    # TODO: should create parameter arg to change policy/value iter later
     def solve(self):
         mdp = self.build_mdp()
-        #self.V, self.Q, self.policy = mdp.policy_iter()
         self.V, self.Q, self.policy = mdp.value_iter()
 
     def save(self, policy_path: str, values_path: str):
         np.save(policy_path, self.policy)
         np.save(values_path, self.V)
 
-    # TODO: Use this load function for resuming training
     def load(self, policy_path: str, values_path: str):
         self.policy = np.load(policy_path)
         self.V = np.load(values_path)

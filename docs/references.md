@@ -6,6 +6,28 @@ throughout many file ... or in my head.
 
 ---
 
+Wang, Chao, et al. "Autonomous navigation of UAV in large-scale unknown complex
+environment with deep reinforcement learning." 2017 IEEE Global Conference on
+Signal and Information Processing (GlobalSIP). Ieee, 2017.
+
+Learn UAV navigation in complex environment with NO prior information. 5
+sensors that recognize location. Discrete-time continuous control using DRL for
+function approximation to solve MDP and POMDP. Use Fast-RDPG algorithm, UAV has
+fixed speed and control of turning left or right starting from any position to
+end in any other position, use GPS and perception of local environment
+
+Five distances from five sensors, orientation and distance angle (current to
+final destination angle). Environment penalty if too close to objects,
+Transition reward for getting closer to destination, Direction reward if nose
+heading in direction of largest free space, Step penalty to urge towards finish.
+
+UAV ends up stuck in local environments sometimes. RDPG is actor-critic solves
+POMDP using two RNNs, critic then actor updates using backpropagation through
+time.
+
+
+---
+
 - Poisson: Modeling rare or independent random events over fixed time/space
 - Bernoulli: Modeling coin flips, does this pixel contain real target or no
 - Markovian: Whats the future state given only current state (memoryless)

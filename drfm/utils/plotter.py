@@ -50,10 +50,6 @@ def generate_plots(log_directory: str):  # noqa: C901
     if os.path.getsize(log_directory) == 0:
         raise ValueError(f"The log file {log_directory} is empty.")
 
-    # check if the log file is a csv file
-    if not log_directory.endswith(".csv"):
-        raise ValueError(f"The log file {log_directory} is not a csv file.")
-
     # extract the name of the log file without the extension
     log_file_name = os.path.splitext(os.path.basename(log_directory))[0]
     # create a new folder in the log directory named log_file_name_plots

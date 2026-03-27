@@ -27,7 +27,6 @@ def pos_error_l2(
 ) -> torch.Tensor:
     """Penalize asset pos from its target pos using L2 squared kernel."""
 
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
 
     if target_pos is None:
@@ -52,7 +51,6 @@ def pos_error_tanh(
 ) -> torch.Tensor:
     """Penalize asset pos from its target pos using L2 squared kernel."""
 
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
 
     if target_pos is None:
@@ -75,7 +73,6 @@ def progress(
 ) -> torch.Tensor:
     """Penalize asset pos from its target pos using L2 squared kernel."""
 
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
 
     target_pos = env.command_manager.get_term(command_name).command[:, :3]
@@ -108,7 +105,6 @@ def lookat_next_gate(
 ) -> torch.Tensor:
     """Reward for looking at the next gate."""
 
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
 
     drone_pos = asset.data.root_pos_w
@@ -127,8 +123,67 @@ def lookat_next_gate(
     return torch.exp(-angle / std)
 
 
+def proximity_penalty(
+    env: ManagerBasedRLEnv,
+    obstacle_names: list,
+    safe_dist: float = 2.5,
+    max_dist: float = 6.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalty in [0,1] that rises as the drone approaches any obstacle center.
+
+    Starts at 0 beyond ``max_dist``, reaches 1 at ``safe_dist`` (and closer).
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    drone_pos = asset.data.root_pos_w
+
+    min_dist = torch.full((env.num_envs,), max_dist, device=env.device)
+    for name in obstacle_names:
+        obs_pos = env.scene[name].data.root_pos_w
+        dist = torch.norm(drone_pos - obs_pos, dim=1)
+        min_dist = torch.minimum(min_dist, dist)
+
+    return torch.clamp((max_dist - min_dist) / (max_dist - safe_dist), 0.0, 1.0)
+
+
+def heading_to_goal(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward in [0,1]: 1 when velocity points at goal, 0.5 perpendicular, 0 away."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    drone_pos = asset.data.root_pos_w
+    drone_vel = asset.data.root_lin_vel_w
+    goal = env.command_manager.get_term(command_name).command[:, :3]
+
+    vec_to_goal = math_utils.normalize(goal - drone_pos)
+    speed = torch.norm(drone_vel, dim=1, keepdim=True).clamp(min=1e-6)
+    vel_dir = drone_vel / speed
+
+    dot = (vel_dir * vec_to_goal).sum(dim=1).clamp(-1.0, 1.0)
+    return (dot + 1.0) * 0.5
+
+
+def arrived(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    threshold: float = 1.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Bonus when drone enters the goal sphere (distance < threshold)."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    goal = env.command_manager.get_term(command_name).command[:, :3]
+    dist = torch.norm(asset.data.root_pos_w - goal, dim=1)
+    return (dist < threshold).float()
+
+
+def step_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Constant 1.0 per step; apply a small negative weight to penalise time."""
+    return torch.ones(env.num_envs, device=env.device)
+
+
 def ang_vel_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Penalize base angular velocity using L2 squared kernel."""
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
     return torch.sum(torch.square(asset.data.root_ang_vel_b), dim=1)

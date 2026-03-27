@@ -13,6 +13,7 @@ from dataclasses import MISSING
 from typing import TYPE_CHECKING
 
 import cv2
+import isaaclab.sim as sim_utils
 import isaaclab.utils.math as math_utils
 import torch
 from isaaclab.assets import Articulation, RigidObjectCollection
@@ -29,38 +30,24 @@ if TYPE_CHECKING:
 
 
 class GateTargetingCommand(CommandTerm):
-    """Command generator that generates a pose command from a uniform distribution."""
-
     cfg: GateTargetingCommandCfg
-    """Configuration for the command generator."""
 
     def __init__(self, cfg: GateTargetingCommandCfg, env: ManagerBasedEnv):
-        """Initialize the command generator class.
-
-        Args:
-            cfg: The configuration parameters for the command generator.
-            env: The environment object.
-        """
-        # initialize the base class
         super().__init__(cfg, env)
 
         self.cfg = cfg
 
-        # FPV video recording
         if self.cfg.record_fpv:
             self.video_id = 0
             self.fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self.sensor_cfg: SceneEntityCfg = SceneEntityCfg("tiled_camera")
             self.sensor: TiledCamera = self._env.scene.sensors[self.sensor_cfg.name]
 
-        # extract the robot and track for which the command is generated
         self.robot: Articulation = env.scene[cfg.asset_name]
         self.track: RigidObjectCollection = env.scene[cfg.track_name]
         self.gate_size = cfg.gate_size
         self.num_gates = self.track.num_objects
 
-        # create buffers
-        # -- commands: (x, y, z, qw, qx, qy, qz) in simulation world frame
         self.env_ids = torch.arange(self.num_envs, device=self.device)
         self.prev_robot_pos_w = self.robot.data.root_pos_w
         self._gate_missed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
@@ -74,16 +61,9 @@ class GateTargetingCommand(CommandTerm):
         msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
         return msg
 
-    """
-    Properties
-    """
-
     @property
     def command(self) -> torch.Tensor:
-        """The desired pose command. Shape is (num_envs, 7).
-
-        The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
-        """
+        """The desired pose command. Shape is (num_envs, 7): [x, y, z, qw, qx, qy, qz]."""
         return self.next_gate_w
 
     @property
@@ -98,15 +78,10 @@ class GateTargetingCommand(CommandTerm):
     def previous_pos(self) -> torch.Tensor:
         return self.prev_robot_pos_w
 
-    """
-    Implementation specific functions.
-    """
-
     def _update_metrics(self):
         pass
 
     def _resample_command(self, env_ids: Sequence[int]):
-        # Release and reinitialize video writer only after the first iteration
         if hasattr(self, "out") and self.cfg.record_fpv:
             self.out.release()
             print(f"FPV video saved as fpv_{self.video_id}.mp4")
@@ -164,7 +139,6 @@ class GateTargetingCommand(CommandTerm):
         next_gate_orientations = self.track.data.object_quat_w[self.env_ids, self.next_gate_idx]
         self.next_gate_w = torch.cat([next_gate_positions, next_gate_orientations], dim=1)
 
-        # Gate passing logic
         (roll, pitch, yaw) = math_utils.euler_xyz_from_quat(self.next_gate_w[:, 3:7])
         normal = torch.stack([torch.cos(yaw), torch.sin(yaw)], dim=1)
         pos_old_projected = (self.prev_robot_pos_w[:, 0] - self.next_gate_w[:, 0]) * normal[:, 0] + (
@@ -183,21 +157,16 @@ class GateTargetingCommand(CommandTerm):
             torch.any(torch.abs(self.robot.data.root_pos_w - self.next_gate_w[:, :3]) > (self.gate_size / 2), dim=1)
         )
 
-        # Update next gate target for the envs that passed the gate
         self.next_gate_idx[self._gate_passed] += 1
         self.next_gate_idx = self.next_gate_idx % self.num_gates
 
         self.prev_robot_pos_w = self.robot.data.root_pos_w
 
     def _set_debug_vis_impl(self, debug_vis: bool):
-        # create markers if necessary for the first time
         if debug_vis:
             if not hasattr(self, "target_visualizer"):
-                # -- goal pose
                 self.target_visualizer = VisualizationMarkers(self.cfg.target_visualizer_cfg)
-                # -- current body pose
                 self.drone_visualizer = VisualizationMarkers(self.cfg.drone_visualizer_cfg)
-            # set their visibility to true
             self.target_visualizer.set_visibility(True)
             self.drone_visualizer.set_visibility(True)
         else:
@@ -206,8 +175,6 @@ class GateTargetingCommand(CommandTerm):
                 self.drone_visualizer.set_visibility(False)
 
     def _debug_vis_callback(self, event):
-        # check if robot is initialized
-        # note: this is needed in-case the robot is de-initialized. we can't access the data
         if not self.robot.is_initialized:
             return
         # update the markers
@@ -215,33 +182,103 @@ class GateTargetingCommand(CommandTerm):
         self.drone_visualizer.visualize(self.robot.data.root_pos_w, self.robot.data.root_quat_w)
 
 
+class WaypointCommand(CommandTerm):
+    cfg: "WaypointCommandCfg"
+
+    def __init__(self, cfg: "WaypointCommandCfg", env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+        self.robot: Articulation = env.scene[cfg.asset_name]
+        self._command = torch.zeros(self.num_envs, 7, device=self.device)
+        self._command[:, 3] = 1.0
+        self._previous_pos = self.robot.data.root_pos_w.clone()
+
+    def __str__(self) -> str:
+        msg = "WaypointCommand:\n"
+        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
+        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
+        return msg
+
+    @property
+    def command(self) -> torch.Tensor:
+        return self._command
+
+    @property
+    def previous_pos(self) -> torch.Tensor:
+        return self._previous_pos
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        n = len(env_ids)
+        rx = torch.empty(n, device=self.device).uniform_(*self.cfg.goal_x_range)
+        ry = torch.empty(n, device=self.device).uniform_(*self.cfg.goal_y_range)
+        rz = torch.empty(n, device=self.device).uniform_(*self.cfg.goal_z_range)
+        self._command[env_ids, :3] = torch.stack([rx, ry, rz], dim=1) + self._env.scene.env_origins[env_ids]
+
+    def _update_command(self):
+        self._previous_pos = self.robot.data.root_pos_w.clone()
+
+    def _update_metrics(self):
+        pass
+
+    def _set_debug_vis_impl(self, debug_vis: bool):
+        if debug_vis:
+            if not hasattr(self, "target_visualizer"):
+                self.target_visualizer = VisualizationMarkers(self.cfg.target_visualizer_cfg)
+                self.drone_visualizer = VisualizationMarkers(self.cfg.drone_visualizer_cfg)
+            self.target_visualizer.set_visibility(True)
+            self.drone_visualizer.set_visibility(True)
+        else:
+            if hasattr(self, "target_visualizer"):
+                self.target_visualizer.set_visibility(False)
+                self.drone_visualizer.set_visibility(False)
+
+    def _debug_vis_callback(self, event):
+        if not self.robot.is_initialized:
+            return
+        self.target_visualizer.visualize(self._command[:, :3], self._command[:, 3:])
+        self.drone_visualizer.visualize(self.robot.data.root_pos_w, self.robot.data.root_quat_w)
+
+
+@configclass
+class WaypointCommandCfg(CommandTermCfg):
+    class_type: type = WaypointCommand
+
+    asset_name: str = MISSING
+    goal_x_range: tuple = (15.0, 25.0)
+    goal_y_range: tuple = (-10.0, 10.0)
+    goal_z_range: tuple = (1.0, 5.0)
+
+    target_visualizer_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/ReconCommand/goal_ring",
+        markers={
+            "ring": sim_utils.CylinderCfg(
+                radius=1.5,
+                height=0.25,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.8, 0.0),
+                    emissive_color=(0.6, 0.45, 0.0),
+                    opacity=0.85,
+                ),
+            )
+        },
+    )
+    drone_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
+        prim_path="/Visuals/ReconCommand/body_pose"
+    )
+    drone_visualizer_cfg.markers["frame"].scale = (0.0001, 0.0001, 0.0001)
+
+
 @configclass
 class GateTargetingCommandCfg(CommandTermCfg):
-    """Configuration for gate targeting command generator."""
-
     class_type: type = GateTargetingCommand
 
     asset_name: str = MISSING
-    """Name of the asset in the environment for which the commands are generated."""
-
     track_name: str = MISSING
-    """Name of the track in the environment for which the commands are generated."""
-
     randomise_start: bool | None = None
-    """If True, the starting gate is randomised at every reset."""
-
     record_fpv: bool = False
-    """If True, the first-person view (FPV) camera is recorded during the simulation."""
-
     gate_size: float = 1.5
-    """Size of the gate in meters. This is used to determine if the drone has passed through the gate."""
 
     target_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
-    """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""
-
     drone_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/body_pose")
-    """The configuration for the current pose visualization marker. Defaults to FRAME_MARKER_CFG."""
 
-    # Set the scale of the visualization markers to (0.1, 0.1, 0.1)
     target_visualizer_cfg.markers["frame"].scale = (0.0001, 0.0001, 0.0001)
     drone_visualizer_cfg.markers["frame"].scale = (0.0001, 0.0001, 0.0001)

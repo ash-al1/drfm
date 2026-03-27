@@ -1,28 +1,31 @@
 ---                                                                                 
 
 # Tasks:                                                                            
-+ Reverse engineer drfm github [repository](https://github.com/mesarcik/DRFM)
-+ Create simple grid, drone and radar objects in Isaac sim
-    + Script a flight path, try and pull entity poses can be exported per
-      timestep
-+ Create realistic action space for DRFM module
++ Create discrete state space for training Drone movement, maybe DRFM too
+    + Populate this state space many times on the entire world to parallelize
++ Change isaac drone racer -> drone navigation
+    + Give it GPS, some sensors to look at the environment, change reward
+    + Run a couple different models, get checkpoints, replay buffers
++ Implement radar and drop 1 radar in discrete state space
++ Implement DRFM, create unit tests for validation
++ Run drone+drfm training on discrete state space with many models
+    + Get checkpoints, replay buffers, experience etc
++ Create visualization functions for this (saliency or something else)
+
+---
+
+# Read
+
+---
+
+# Ideas
++ Create difficult environments that can train UAV navigation and DRFM module
+  separately, or together that are unrealistic yet help train an agent.
 + Use Isaac sim to export drone pos/vel. emitter location, LoS or not. Feed
   data into RF model, compute J/S and detection. Echo, Jamming power,J/S ratio,
   etc. Agent receives J/S ratio and detection status as observation vector, then
   calculates reward based off agent perforamnce. +1 reward every timestep alive,
   maybe bonus if radar loses track, penalties for being detected and locked on.
-+ Tabular RL Q-learning model implementation to test a simple agent can learn to
-  survive. Agents actions could be to select DRFM module parameters. Drone
-  maneuvarability should be continuous algorithm.
-
----
-
-# Read
-+ [Drone Racing](https://www.nature.com/articles/s41586-023-06419-4.pdf)
-
----
-
-# Ideas
 + Use the nature racing drone concept of implementing controller and firmware
   for input peculiarities to the drone input, we can do the same for DRFM module
   Mesarcik's DRFM implementation ... plug and play
@@ -68,13 +71,26 @@
 ---
 
 # Poor:
++ Can not just use isaac drone racer out of the box, algorithm and MDP dynamics
+  are incomplete for our task
++ [DRFM - Mesarcik](https://github.com/mesarcik/DRFM) is not useful DRFM action
+  space, not built on real world techniques. It does amplitude, frequency,
+  phase, etc changes - which is fundamentally accurate yet mathematically
+  nebulous. It simplifies a DRFM module too much.
++ Using an FPGA is problematic because of time constraints, can't wait for data
+  in/out for each iteration on many agents in an environment.
 
 ---
 
 # Done:
-+ Build a simple gymnasium wrapper environment mockup
-    + Define observation space (pos, J/s ratio) and discrete action space
-+ Implement core RF (basic) modeling on a standalone python file
++ Defined DRFM action space as [Off, RGPO, VGPO, RVGPO]
+    - Discrete action space, continuous parameter selection per technique
+    - PPO with discrete head, continuous head per technique for parameters
++ Pull Isaac drone racer project 
++ Tabular RL Q-learning model implementation to test a simple agent can learn to
+  survive. Agents actions could be to select DRFM module parameters. Drone
+  maneuvarability should be continuous algorithm. (`drfm_grid_env.py`)
++ Implement core RF (basic) modeling on a standalone python file. -> (`basic_model.py`)
     + Radar echo, Jamming power, J/S ratio, burn-through range
 + Monte Carlo
 + TD(0), TD(1), TD(Lambda) - compare if front or backwards view
@@ -84,8 +100,4 @@
 + Expose Q-value in libmdp
 + Map continuous to map discrete values
 + Port libmdp and libsparse over from mini projects
-
----
-
-# People:
 

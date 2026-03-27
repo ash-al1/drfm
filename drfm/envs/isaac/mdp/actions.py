@@ -23,14 +23,9 @@ if TYPE_CHECKING:
 
 
 class ControlAction(ActionTerm):
-    r"""Body torque control action term.
-
-    This action term applies a wrench to the drone body frame based on action commands
-
-    """
+    """Applies thrust and torque wrench to the drone body from [-1,1] action commands."""
 
     cfg: ControlActionCfg
-    """The configuration of the action term."""
 
     def __init__(self, cfg: ControlActionCfg, env: ManagerBasedRLEnv) -> None:
         super().__init__(cfg, env)
@@ -66,13 +61,8 @@ class ControlAction(ActionTerm):
             dtype=self._raw_actions.dtype,
         )
 
-    """
-    Properties.
-    """
-
     @property
     def action_dim(self) -> int:
-        # TODO: make more explicit (thrust = 6, rates = 6, attitude = 6) all happen to be 6, but they represent different things
         return self._raw_actions.shape[1]
 
     @property
@@ -87,13 +77,9 @@ class ControlAction(ActionTerm):
     def has_debug_vis_implementation(self) -> bool:
         return False
 
-    """
-    Operations.
-    """
-
     def process_actions(self, actions: torch.Tensor):
 
-        self._raw_actions[:] = actions
+        self._raw_actions[:] = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         clamped = self._raw_actions.clamp_(-1.0, 1.0)
         mapped = (clamped + 1.0) / 2.0
         omega_ref = self.cfg.omega_max * mapped
@@ -106,7 +92,7 @@ class ControlAction(ActionTerm):
     def apply_actions(self):
         self._thrust[:, 0, 2] = self._processed_actions[:, 0]
         self._moment[:, 0, :] = self._processed_actions[:, 1:]
-        self._robot.set_external_force_and_torque(self._thrust, self._moment, body_ids=self._body_id)
+        self._robot.permanent_wrench_composer.set_forces_and_torques(self._thrust, self._moment, body_ids=self._body_id)
 
         self._elapsed_time += self._env.physics_dt
         log(self._env, ["time"], self._elapsed_time)
@@ -128,34 +114,15 @@ class ControlAction(ActionTerm):
 
 @configclass
 class ControlActionCfg(ActionTermCfg):
-    """
-    See :class:`ControlAction` for more details.
-    """
-
     class_type: type[ActionTerm] = ControlAction
-    """ Class of the action term."""
 
     asset_name: str = "robot"
-    """Name of the asset in the environment for which the commands are generated."""
     arm_length: float = 0.035
-    """Length of the arms of the drone in meters."""
     drag_coef: float = 1.5e-9
-    """Drag torque coefficient."""
     thrust_coef: float = 2.25e-7
-    """Thrust coefficient.
-    Calculated with 5145 rad/s max angular velociy, thrust to weight: 4, mass: 0.6076 kg and gravity: 9.81 m/s^2.
-    thrust_coef = (4 * 0.6076 * 9.81) / (4 * 5145**2) = 2.25e-7."""
     omega_max: float = 5145.0
-    """Maximum angular velocity of the drone motors in rad/s.
-    Calculated with 1950KV motor, with 6S LiPo battery with 4.2V per cell.
-    1950 * 6 * 4.2 = 49,140 RPM ~= 5145 rad/s."""
     taus: list[float] = (0.0001, 0.0001, 0.0001, 0.0001)
-    """Time constants for each motor."""
     init: list[float] = (2572.5, 2572.5, 2572.5, 2572.5)
-    """Initial angular velocities for each motor in rad/s."""
     max_rate: list[float] = (50000.0, 50000.0, 50000.0, 50000.0)
-    """Maximum rate of change of angular velocities for each motor in rad/s^2."""
     min_rate: list[float] = (-50000.0, -50000.0, -50000.0, -50000.0)
-    """Minimum rate of change of angular velocities for each motor in rad/s^2."""
     use_motor_model: bool = False
-    """Flag to determine if motor delay is bypassed."""

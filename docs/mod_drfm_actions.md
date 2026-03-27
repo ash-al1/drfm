@@ -152,3 +152,7 @@ in azimuth can be represented as: $$H_n(\omega, u) = \sigma_n \exp\left( jk \fra
 
 EA needs to know radar location at every moment for azimuth deception. The
 azimuth deception modulator can be simplified as: $$H_n(\omega, \theta) = \sigma_n \exp(-j 2 k \Delta y \sin \theta)$$
+
+## References
+
+1. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.

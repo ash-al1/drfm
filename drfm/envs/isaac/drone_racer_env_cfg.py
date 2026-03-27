@@ -124,8 +124,6 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    # reset
-    # TODO: Resetting base happens in the command reset also for the moment
     reset_base = EventTerm(
         func=mdp.reset_root_state_uniform,
         mode="reset",
@@ -258,9 +256,6 @@ class DroneRacerEnvCfg_PLAY(ManagerBasedRLEnvCfg):
 
         # Disable push robot events
         self.events.push_robot = None
-
-        # Enable recording fpv footage
-        # self.commands.target.record_fpv = True
 
         # general settings
         self.decimation = 4

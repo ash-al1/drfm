@@ -25,19 +25,9 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
 <table align="center">
     <tr>
         <td>
-            <img src="media/transponder.gif" height="200px" /><br>
-            Transponder
-        </td>
-        <td>
-            <img src="media/repeater.gif" height="200px" /><br>
-            Repeater
-        </td>
-        <td>
             <img src="media/rgpo.gif" height="200px" /><br>
             RGPO
         </td>
-    </tr>
-    <tr>
         <td>
             <img src="media/vgpo.gif" height="200px" /><br>
             VGPO
@@ -45,10 +35,6 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
         <td>
             <img src="media/rgpo+vgpo.gif" height="200px" /><br>
             Coordinated
-        </td>
-        <td>
-            <img src="media/sarmap.gif" height="200px" /><br>
-            SAR Decoy
         </td>
     </tr>
 </table>
@@ -95,7 +81,8 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 
 ## References
 
-1. Kaufmann, E., et al. "Champion-level drone racing using deep reinforcement learning." *Nature* 620.7976 (2023): 982–987.
+1. Wang, Chao, et al. *"Autonomous navigation of UAV in large-scale unknown complex environment with deep reinforcement learning."* GlobalSIP 2017
+1. Kaufmann, E., et al. *"Champion-level drone racing using deep reinforcement learning."* Nature, 2023
 2. Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
 3. Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
 4. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.

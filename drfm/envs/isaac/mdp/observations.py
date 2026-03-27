@@ -42,7 +42,6 @@ def root_quat_w(
 ) -> torch.Tensor:
     """Asset root orientation (w, x, y, z) in the environment frame."""
 
-    # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
 
     quat = asset.data.root_quat_w
@@ -53,10 +52,8 @@ def root_quat_w(
 def root_rotmat_w(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Asset root orientation (3x3 flattened rotation matrix) in the world frame."""
     asset: RigidObject = env.scene[asset_cfg.name]
-
     quat = asset.data.root_quat_w
-    rotmat = math_utils.matrix_from_quat(quat)
-    flat_rotmat = rotmat.view(-1, 9)
+    flat_rotmat = math_utils.matrix_from_quat(quat).view(-1, 9)
     log(env, ["r11", "r12", "r13", "r21", "r22", "r23", "r31", "r32", "r33"], flat_rotmat)
     return flat_rotmat
 
@@ -77,30 +74,19 @@ def root_pose_g(
     """Asset root position in the gate frame."""
     asset: RigidObject = env.scene[asset_cfg.name]
 
-    gate_pose_w = env.command_manager.get_term(command_name).command  # (num_envs, 7)
-    drone_pose_w = asset.data.root_state_w[:, :7]  # (num_envs, 7)
+    gate_pose_w = env.command_manager.get_term(command_name).command
+    drone_pose_w = asset.data.root_state_w[:, :7]
 
-    # Extract positions and quaternions
     gate_pos_w = gate_pose_w[:, :3]
     gate_quat_w = gate_pose_w[:, 3:7]
     drone_pos_w = drone_pose_w[:, :3]
     drone_quat_w = drone_pose_w[:, 3:7]
 
-    # Compute drone pose in gate frame
-    # Inverse gate quaternion
     gate_quat_w_inv = math_utils.quat_inv(gate_quat_w)
-
-    # Position of drone in gate frame
-    rel_pos = drone_pos_w - gate_pos_w
-    drone_pos_g = math_utils.quat_rotate(gate_quat_w_inv, rel_pos)
-
-    # Orientation of drone in gate frame
+    drone_pos_g = math_utils.quat_rotate(gate_quat_w_inv, drone_pos_w - gate_pos_w)
     drone_quat_g = math_utils.quat_mul(gate_quat_w_inv, drone_quat_w)
 
-    # Concatenate position and quaternion
-    position = torch.cat([drone_pos_g, drone_quat_g], dim=-1)
-
-    return position
+    return torch.cat([drone_pos_g, drone_quat_g], dim=-1)
 
 
 def next_gate_pose_g(
@@ -108,30 +94,19 @@ def next_gate_pose_g(
     command_name: str,
 ) -> torch.Tensor:
     """Asset root position in the gate frame."""
-    gate_pose_w = env.command_manager.get_term(command_name).command  # (num_envs, 7)
-    next_gate_pose_w = env.command_manager.get_term(command_name).next_gate  # (num_envs, 7)
+    gate_pose_w = env.command_manager.get_term(command_name).command
+    next_gate_pose_w = env.command_manager.get_term(command_name).next_gate
 
-    # Extract positions and quaternions
     gate_pos_w = gate_pose_w[:, :3]
     gate_quat_w = gate_pose_w[:, 3:7]
     next_gate_pos_w = next_gate_pose_w[:, :3]
     next_gate_quat_w = next_gate_pose_w[:, 3:7]
 
-    # Compute drone pose in gate frame
-    # Inverse gate quaternion
     gate_quat_w_inv = math_utils.quat_inv(gate_quat_w)
-
-    # Position of drone in gate frame
-    rel_pos = next_gate_pos_w - gate_pos_w
-    next_gate_pos_g = math_utils.quat_rotate(gate_quat_w_inv, rel_pos)
-
-    # Orientation of drone in gate frame
+    next_gate_pos_g = math_utils.quat_rotate(gate_quat_w_inv, next_gate_pos_w - gate_pos_w)
     next_gate_quat_g = math_utils.quat_mul(gate_quat_w_inv, next_gate_quat_w)
 
-    # Concatenate position and quaternion
-    position = torch.cat([next_gate_pos_g, next_gate_quat_g], dim=-1)
-
-    return position
+    return torch.cat([next_gate_pos_g, next_gate_quat_g], dim=-1)
 
 
 def target_pos_b(
@@ -141,12 +116,10 @@ def target_pos_b(
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Position of target in body frame."""
-
     asset: RigidObject = env.scene[asset_cfg.name]
 
     if target_pos is None:
-        target_pos = env.command_manager.get_term(command_name).command[:, :3]
-        target_pos_tensor = target_pos[:, :3]
+        target_pos_tensor = env.command_manager.get_term(command_name).command[:, :3]
     else:
         target_pos_tensor = (
             torch.tensor(target_pos, dtype=torch.float32, device=asset.device).repeat(env.num_envs, 1)
@@ -154,5 +127,4 @@ def target_pos_b(
         )
 
     pos_b, _ = math_utils.subtract_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, target_pos_tensor)
-
     return pos_b
