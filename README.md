@@ -41,6 +41,14 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
 
 ## Phases
 
+<table align="center">
+    <tr>
+        <td>
+            <img src="media/phase2.gif" height="200px" /><br>
+        </td>
+    </tr>
+</table>
+
 Environment is split into two phases: (1) navigation, (2) DRFM. This allows us
 to test different agents, architectures on invidiual problems. Later the agent
 will be packaged without any regards for which phase to use.
@@ -58,7 +66,6 @@ HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v
 
 python scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
-
 
 ## Setup
 
