@@ -25,11 +25,15 @@ from . import mdp
 
 from assets.five_in_drone import FIVE_IN_DRONE  # isort:skip
 
-# All scene entities fed into the proximity reward
 _OBSTACLE_NAMES = [
     "obstacle_box1", "obstacle_box2", "obstacle_box3", "obstacle_box4",
     "wall_north", "wall_south", "wall_east", "wall_west",
 ]
+
+
+def _reset_contact_sensor(env, env_ids):
+    contact_sensor = env.scene.sensors["collision_sensor"]
+    contact_sensor.data.net_forces_w[env_ids] = 0.0
 
 
 def _box(prim: str, size, pos, color) -> RigidObjectCfg:
@@ -160,6 +164,7 @@ class EventCfg:
             },
         },
     )
+    reset_contact = EventTerm(func=_reset_contact_sensor, mode="reset")
 
 
 @configclass
