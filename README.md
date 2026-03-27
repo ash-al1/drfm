@@ -127,6 +127,15 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 │   └── utils/
 ```
 
+## TODOS
+
+[ ] Rewards that take into account radar and DRFM module
+[ ] More agents for wider study
+[ ] Incorporate GNU Radio for direct RF signals
+[ ] Pull FPGA statistics, compute for DRFM usage
+[ ] Change drone to fixed wing or non-racing drone
+[ ] Change environment to be more realistic
+
 ## References
 
 1. Wang, Chao, et al. *"Autonomous navigation of UAV in large-scale unknown complex environment with deep reinforcement learning."* GlobalSIP 2017
