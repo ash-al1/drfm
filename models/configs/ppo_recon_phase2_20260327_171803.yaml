@@ -1,9 +1,9 @@
 algorithm: PPO
-task: recon_play_phase1
-timestamp: '2026-03-27T13:04:33'
+task: recon_phase2
+timestamp: '2026-03-27T17:18:03'
 architecture: mlp_actor_critic
-observation_dim: 14
-action_dim: 4
+observation_dim: 62
+action_dim: 11
 hidden_sizes:
 - 256
 - 256
@@ -19,15 +19,15 @@ epochs: 5
 max_grad_norm: 1.0
 num_envs: 4096
 rollout_steps: 256
-total_timesteps: 25000
+total_timesteps: 50000
 waypoints_per_episode: 3
 w_progress: 20.0
-w_heading: 1.0
+w_heading: 2.0
 w_arrived: 500.0
 w_completion_bonus: 1000.0
-w_terminating: -100.0
-w_step_penalty: -0.01
+w_terminating: -1000.0
+w_step_penalty: -0.05
 w_proximity: -1.0
 terrain: flat
 obstacles: true
-radars: false
+radars: true
