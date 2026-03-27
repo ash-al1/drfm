@@ -83,8 +83,17 @@ class LoggedPPO(PPO):
 
     def _update(self, timestep, timesteps):
         self._update_count += 1
+        with torch.no_grad():
+            values = self.memory.get_tensor_by_name("values")
+            rewards = self.memory.get_tensor_by_name("rewards")
+            log_probs = self.memory.get_tensor_by_name("log_prob")
+            if torch.isnan(values).any() or torch.isnan(rewards).any() or torch.isnan(log_probs).any():
+                print(f"[WARN] NaN in memory at update {self._update_count}: "
+                      f"values_nan={torch.isnan(values).any().item()} "
+                      f"rewards_nan={torch.isnan(rewards).any().item()} "
+                      f"log_probs_nan={torch.isnan(log_probs).any().item()}")
         PPO._update(self, timestep, timesteps)
-        self.last_metrics = dict(self.tracking_data)
+        self.last_metrics = {k: list(v) for k, v in self.tracking_data.items()}
 
 
 def _fmt_time(seconds: float) -> str:
@@ -220,7 +229,7 @@ class EpisodeStatsWrapper(gym.Wrapper):
                 torch.save(agent.policy.state_dict(), os.path.join(self._run_dir, "actor.pt"))
                 torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
                 agent.save(os.path.join(self._run_dir, "agent_best.pt"))
-                print(f"        *** new best R={mean_r:+.1f} — checkpoint saved ***")
+                print(f"        *** new best R={mean_r:+.1f} - checkpoint saved ***")
 
         return obs, rew, terminated, truncated, info
 
@@ -277,7 +286,7 @@ def _build_agent(env, agent_cfg):
         "entropy_loss_scale":             a.get("entropy_loss_scale", 0.005),
         "value_loss_scale":               a.get("value_loss_scale", 1.0),
         "kl_threshold":                   a.get("kl_threshold", 0.0),
-        "time_limit_bootstrap":           a.get("time_limit_bootstrap", True),
+        "time_limit_bootstrap":           a.get("time_limit_bootstrap", False),
         "experiment": {
             "directory":           a["experiment"]["directory"],
             "experiment_name":     a["experiment"]["experiment_name"],

@@ -173,7 +173,7 @@ def main() -> None:
         print(f"[INFO] Loading checkpoint: {resume_path}")
         agent.load(resume_path)
     else:
-        print("[INFO] No checkpoint found — running with untrained policy.")
+        print("[INFO] No checkpoint found - running with untrained policy.")
 
     agent.set_running_mode("eval")
 

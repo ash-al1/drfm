@@ -144,7 +144,7 @@ class CommandsCfg:
         goal_x_range=(5.0, 28.0),
         goal_y_range=(-11.0, 11.0),
         goal_z_range=(1.0, 3.5),
-        waypoints_per_episode=5,
+        waypoints_per_episode=1,
         arrival_threshold=2.5,
         obstacle_margin=2.0,
         resampling_time_range=(1e9, 1e9),
@@ -173,12 +173,12 @@ class EventCfg:
 
 @configclass
 class RewardsCfg:
-    progress         = RewTerm(func=mdp.progress,          weight=40.0,   params={"command_name": "target"})
-    heading          = RewTerm(func=mdp.heading_to_goal,    weight=2.0,    params={"command_name": "target"})
+    progress         = RewTerm(func=mdp.progress,          weight=60.0,   params={"command_name": "target"})
+    heading          = RewTerm(func=mdp.heading_to_goal,    weight=3.0,    params={"command_name": "target"})
     arrived          = RewTerm(func=mdp.arrived,            weight=500.0,  params={"command_name": "target", "threshold": 2.5})
     completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=2000.0, params={"command_name": "target"})
-    distance_penalty = RewTerm(func=mdp.distance_to_goal,   weight=-0.3,   params={"command_name": "target"})
-    step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.05)
+    distance_penalty = RewTerm(func=mdp.distance_to_goal,   weight=-1.0,   params={"command_name": "target"})
+    step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.1)
     ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,         weight=-0.001)
     proximity        = RewTerm(
         func=mdp.proximity_penalty,
@@ -209,7 +209,7 @@ class DroneReconEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 4
-        self.episode_length_s = 30        # 5 waypoints × ~6s each
+        self.episode_length_s = 15        # shorter episodes, more resets = faster learning
         self.viewer.eye = (-4.0, 0.0, 1.0)
         self.viewer.lookat = (10.0, 0.0, 2.0)
         self.sim.dt = 1 / 400
@@ -228,7 +228,7 @@ class DroneReconEnvCfg_PLAY(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 4
-        self.episode_length_s = 30
+        self.episode_length_s = 15
         self.sim.dt = 1 / 400
         self.viewer.origin_type = "asset_root"
         self.viewer.asset_name = "robot"
