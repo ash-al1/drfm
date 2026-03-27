@@ -211,9 +211,10 @@ def main() -> None:
             obs_has_nan = torch.isnan(o).any().item()
 
             target_b = o[:3]
-            quat = o[3:7]
-            lin_vel = o[7:10]
-            ang_vel = o[10:13]
+            wp_rem = o[3]
+            quat = o[4:8]
+            lin_vel = o[8:11]
+            ang_vel = o[11:14]
             roll, pitch, yaw = _quat_to_euler_deg(quat.tolist())
             target_dist = torch.norm(target_b).item()
 
@@ -224,6 +225,7 @@ def main() -> None:
                 print(
                     f"[ep={num_episode} step={ep_steps:4d}] "
                     f"pos_body=({target_b[0]:+6.1f},{target_b[1]:+6.1f},{target_b[2]:+6.1f}) "
+                    f"wp_rem={wp_rem:.2f} "
                     f"dist={target_dist:5.1f}  "
                     f"rpy=({roll:+6.1f},{pitch:+6.1f},{yaw:+6.1f})  "
                     f"vel=({lin_vel[0]:+5.1f},{lin_vel[1]:+5.1f},{lin_vel[2]:+5.1f})  "

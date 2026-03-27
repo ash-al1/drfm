@@ -1,5 +1,4 @@
 #
-#
 
 from __future__ import annotations
 
@@ -56,3 +55,13 @@ def target_pos_b(
 
     pos_b, _ = math_utils.subtract_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, target_pos_tensor)
     return pos_b
+
+
+def waypoints_remaining(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+) -> torch.Tensor:
+    cmd = env.command_manager.get_term(command_name)
+    remaining = cmd.waypoints_remaining.unsqueeze(-1)
+    total = cmd.cfg.waypoints_per_episode
+    return remaining / max(total, 1)

@@ -1,5 +1,4 @@
 #
-#
 
 from __future__ import annotations
 
@@ -18,23 +17,16 @@ def too_high(
     max_z: float = 8.0,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Terminate when the drone exceeds the altitude ceiling (env-local z)."""
     asset: RigidObject = env.scene[asset_cfg.name]
     height = asset.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
     return height > max_z
 
 
-def reached_goal(
+def all_waypoints_done(
     env: ManagerBasedRLEnv,
     command_name: str,
-    threshold: float = 1.5,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Terminate (success) when the drone reaches the goal waypoint."""
-    asset: RigidObject = env.scene[asset_cfg.name]
-    goal = env.command_manager.get_term(command_name).command[:, :3]
-    dist = torch.linalg.norm(asset.data.root_pos_w - goal, dim=1)
-    return dist < threshold
+    return env.command_manager.get_term(command_name).all_done
 
 
 def flyaway(
@@ -44,8 +36,6 @@ def flyaway(
     target_pos: list | None = None,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Terminate when the asset's is too far away from the target position."""
-
     asset: RigidObject = env.scene[asset_cfg.name]
 
     if target_pos is None:

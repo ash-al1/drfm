@@ -63,7 +63,7 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = FIVE_IN_DRONE.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     collision_sensor: ContactSensorCfg = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/.*", debug_vis=False
+        prim_path="{ENV_REGEX_NS}/Robot/.*", debug_vis=True
     )
 
     # --- Interior obstacles ---
@@ -120,14 +120,15 @@ class ActionsCfg:
 
 @configclass
 class ObservationsCfg:
-    """13D: goal in body frame + quaternion + linear vel + angular vel."""
+    """14D: goal in body frame + remaining waypoints + quaternion + linear vel + angular vel."""
 
     @configclass
     class PolicyCfg(ObsGroup):
-        target_pos_b = ObsTerm(func=mdp.target_pos_b, params={"command_name": "target"})
-        attitude     = ObsTerm(func=mdp.root_quat_w)
-        lin_vel      = ObsTerm(func=mdp.root_lin_vel_b)
-        ang_vel      = ObsTerm(func=mdp.root_ang_vel_b)
+        target_pos_b      = ObsTerm(func=mdp.target_pos_b, params={"command_name": "target"})
+        waypoints_remaining = ObsTerm(func=mdp.waypoints_remaining, params={"command_name": "target"})
+        attitude           = ObsTerm(func=mdp.root_quat_w)
+        lin_vel            = ObsTerm(func=mdp.root_lin_vel_b)
+        ang_vel            = ObsTerm(func=mdp.root_ang_vel_b)
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -140,9 +141,12 @@ class ObservationsCfg:
 class CommandsCfg:
     target = mdp.WaypointCommandCfg(
         asset_name="robot",
-        goal_x_range=(15.0, 25.0),
-        goal_y_range=(-10.0, 10.0),
-        goal_z_range=(1.0, 5.0),
+        goal_x_range=(5.0, 28.0),
+        goal_y_range=(-11.0, 11.0),
+        goal_z_range=(1.0, 3.5),
+        waypoints_per_episode=5,
+        arrival_threshold=2.5,
+        obstacle_margin=2.0,
         resampling_time_range=(1e9, 1e9),
         debug_vis=True,
     )
@@ -169,26 +173,27 @@ class EventCfg:
 
 @configclass
 class RewardsCfg:
-    progress     = RewTerm(func=mdp.progress,          weight=20.0,   params={"command_name": "target"})
-    arrived      = RewTerm(func=mdp.arrived,            weight=400.0,  params={"command_name": "target", "threshold": 2.5})
-    terminating  = RewTerm(func=mdp.is_terminated,      weight=-500.0)
-    step_penalty = RewTerm(func=mdp.step_penalty,       weight=-0.001)
-    ang_vel_l2   = RewTerm(func=mdp.ang_vel_l2,         weight=-0.0001)
-    proximity    = RewTerm(
+    progress         = RewTerm(func=mdp.progress,          weight=20.0,   params={"command_name": "target"})
+    arrived          = RewTerm(func=mdp.arrived,            weight=400.0,  params={"command_name": "target", "threshold": 2.5})
+    completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=1000.0, params={"command_name": "target"})
+    terminating      = RewTerm(func=mdp.is_terminated,      weight=-500.0)
+    step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.001)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,         weight=-0.0001)
+    proximity        = RewTerm(
         func=mdp.proximity_penalty,
         weight=-2.0,
         params={"obstacle_names": _OBSTACLE_NAMES, "safe_dist": 2.5, "max_dist": 6.0},
     )
-    heading      = RewTerm(func=mdp.heading_to_goal,    weight=0.3,    params={"command_name": "target"})
+    heading          = RewTerm(func=mdp.heading_to_goal,    weight=0.3,    params={"command_name": "target"})
 
 
 @configclass
 class TerminationsCfg:
-    time_out     = DoneTerm(func=mdp.time_out, time_out=True)
-    reached_goal = DoneTerm(func=mdp.reached_goal,     params={"command_name": "target", "threshold": 2.5})
-    collision    = DoneTerm(func=mdp.illegal_contact,   params={"sensor_cfg": SceneEntityCfg("collision_sensor"), "threshold": 0.01})
-    flyaway      = DoneTerm(func=mdp.flyaway,           params={"command_name": "target", "distance": 50.0})
-    too_high     = DoneTerm(func=mdp.too_high,          params={"max_z": 4.0})
+    time_out         = DoneTerm(func=mdp.time_out,          time_out=True)
+    all_waypoints    = DoneTerm(func=mdp.all_waypoints_done, params={"command_name": "target"})
+    collision        = DoneTerm(func=mdp.illegal_contact,    params={"sensor_cfg": SceneEntityCfg("collision_sensor"), "threshold": 0.01})
+    flyaway          = DoneTerm(func=mdp.flyaway,            params={"command_name": "target", "distance": 50.0})
+    too_high         = DoneTerm(func=mdp.too_high,           params={"max_z": 4.0})
 
 
 @configclass
@@ -203,8 +208,8 @@ class DroneReconEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 4
-        self.episode_length_s = 12        # reduced from 20 s — enough to fly 25 m at speed
-        self.viewer.eye = (-5.0, -5.0, 8.0)
+        self.episode_length_s = 30        # 5 waypoints × ~6s each
+        self.viewer.eye = (-4.0, 0.0, 1.0)
         self.viewer.lookat = (10.0, 0.0, 2.0)
         self.sim.dt = 1 / 400
         self.sim.render_interval = self.decimation
@@ -222,7 +227,7 @@ class DroneReconEnvCfg_PLAY(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 4
-        self.episode_length_s = 12
+        self.episode_length_s = 30
         self.sim.dt = 1 / 400
         self.viewer.origin_type = "asset_root"
         self.viewer.asset_name = "robot"

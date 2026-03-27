@@ -1,5 +1,4 @@
 #
-#
 
 from __future__ import annotations
 
@@ -77,6 +76,14 @@ def arrived(
     goal = env.command_manager.get_term(command_name).command[:, :3]
     dist = torch.norm(asset.data.root_pos_w - goal, dim=1)
     return (dist < threshold).float()
+
+
+def completion_bonus(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+) -> torch.Tensor:
+    cmd = env.command_manager.get_term(command_name)
+    return cmd.all_done.float()
 
 
 def step_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
