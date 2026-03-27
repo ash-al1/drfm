@@ -70,6 +70,16 @@ from skrl.trainers.torch import SequentialTrainer
 from models.architectures.mlp_actor_critic import MLPActor, MLPCritic
 
 
+class LoggedPPO(PPO):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_metrics = {}
+
+    def _log_writer(self, tag, value, timestep):
+        self.last_metrics[tag] = value
+        PPO._log_writer(self, tag, value, timestep)
+
+
 def _fmt_time(seconds: float) -> str:
     s = int(seconds)
     m, s = divmod(s, 60)
@@ -172,10 +182,24 @@ class EpisodeStatsWrapper(gym.Wrapper):
 
             print(
                 f"[train] {progress}  fps={fps:,.0f}  {time_str}\n"
-                f"        ep={n}  R={mean_r:+.1f}±{std_r:.1f}  "
+                f"        ep={n}  R={mean_r:+.1f}\u00b1{std_r:.1f}  "
                 f"[{min(rets):.1f}, {max(rets):.1f}]  "
                 f"len={mean_len:.0f}  timeout={timeout_pct:.0f}%"
             )
+
+            if self._agent_ref and self._agent_ref[0] is not None:
+                m = self._agent_ref[0].last_metrics
+                pi_loss = m.get("Loss/policy_loss", 0)
+                v_loss = m.get("Loss/value_loss", 0)
+                entropy = m.get("Policy/entropy", 0)
+                approx_kl = m.get("Policy/approx_kl", 0)
+                clip_frac = m.get("Policy/clip_fraction", 0)
+                lr = m.get("Loss/learning_rate", 0)
+                print(
+                    f"        pi_loss={pi_loss:.4f}  v_loss={v_loss:.4f}  "
+                    f"entropy={entropy:.4f}  approx_kl={approx_kl:.6f}  "
+                    f"clip={clip_frac:.3f}  lr={lr:.2e}"
+                )
 
             if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
                 self._best_return = mean_r
@@ -253,7 +277,7 @@ def _build_agent(env, agent_cfg):
         scale = a["rewards_shaper_scale"]
         cfg["rewards_shaper"] = lambda rewards, *args, **kwargs: rewards * scale
 
-    return PPO(
+    return LoggedPPO(
         models=models, memory=memory, cfg=cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,

@@ -6,6 +6,7 @@
 
 import argparse
 import glob
+import math
 import os
 import sys
 import time
@@ -105,6 +106,20 @@ def _build_agent(env, agent_cfg):
     )
 
 
+def _quat_to_euler_deg(q):
+    w, x, y, z = q
+    sinr = 2.0 * (w * x + y * z)
+    cosr = 1.0 - 2.0 * (x * x + y * y)
+    roll = math.degrees(math.atan2(sinr, cosr))
+    sinp = 2.0 * (w * y - z * x)
+    sinp = max(-1.0, min(1.0, sinp))
+    pitch = math.degrees(math.asin(sinp))
+    siny = 2.0 * (w * z + x * y)
+    cosy = 1.0 - 2.0 * (y * y + z * z)
+    yaw = math.degrees(math.atan2(siny, cosy))
+    return roll, pitch, yaw
+
+
 def main() -> None:
     if args_cli.log and args_cli.num_envs > 1:
         raise ValueError("Logging requires --num_envs 1.")
@@ -129,6 +144,8 @@ def main() -> None:
 
     if isinstance(env.unwrapped, DirectMARLEnv) and algorithm == "ppo":
         env = multi_agent_to_single_agent(env)
+
+    raw_env = env.unwrapped
 
     try:
         dt = env.step_dt
@@ -162,6 +179,12 @@ def main() -> None:
     obs, _ = env.reset()
     timestep = 0
     num_episode = 0
+    ep_return = 0.0
+    ep_steps = 0
+    prev_episode_ended = False
+
+    print(f"\n[DEBUG] Observation shape: {obs.shape}")
+    print(f"[DEBUG] Episode length: {env_cfg.episode_length_s}s")
 
     while simulation_app.is_running():
         start_time = time.time()
@@ -174,6 +197,77 @@ def main() -> None:
                 actions = outputs[-1].get("mean_actions", outputs[0])
             obs, rew, terminated, truncated, info = env.step(actions)
 
+        if args_cli.num_envs == 1:
+            o = obs[0].cpu()
+            a = actions[0].cpu()
+            r = rew[0].item()
+            t = terminated[0].item()
+            tr = truncated[0].item()
+            ep_return += r
+            ep_steps += 1
+
+            obs_min = o.min().item()
+            obs_max = o.max().item()
+            obs_has_nan = torch.isnan(o).any().item()
+
+            target_b = o[:3]
+            quat = o[3:7]
+            lin_vel = o[7:10]
+            ang_vel = o[10:13]
+            roll, pitch, yaw = _quat_to_euler_deg(quat.tolist())
+            target_dist = torch.norm(target_b).item()
+
+            if obs_has_nan:
+                print(f"[DEBUG] *** NaN IN OBSERVATIONS at step {ep_steps} ***")
+
+            if ep_steps <= 3 or t or tr or ep_steps % 100 == 0:
+                print(
+                    f"[ep={num_episode} step={ep_steps:4d}] "
+                    f"pos_body=({target_b[0]:+6.1f},{target_b[1]:+6.1f},{target_b[2]:+6.1f}) "
+                    f"dist={target_dist:5.1f}  "
+                    f"rpy=({roll:+6.1f},{pitch:+6.1f},{yaw:+6.1f})  "
+                    f"vel=({lin_vel[0]:+5.1f},{lin_vel[1]:+5.1f},{lin_vel[2]:+5.1f})  "
+                    f"w=({ang_vel[0]:+5.1f},{ang_vel[1]:+5.1f},{ang_vel[2]:+5.1f})  "
+                    f"act=({a[0]:+5.2f},{a[1]:+5.2f},{a[2]:+5.2f},{a[3]:+5.2f})  "
+                    f"rew={r:+7.2f}  obs=[{obs_min:+.2f},{obs_max:+.2f}]"
+                )
+
+            if t or tr:
+                reason = []
+                if hasattr(raw_env, "episode_extras"):
+                    extras = raw_env.episode_extras
+                    for k, v in extras.items():
+                        if hasattr(v, '__len__') and len(v) > 0:
+                            val = v[0] if hasattr(v, '__getitem__') else v
+                            reason.append(f"{k}={val}")
+                reason_str = ", ".join(reason) if reason else "unknown"
+                term_type = "TERMINATED" if t else "TRUNCATED"
+                print(
+                    f"\n[DEBUG] === EPISODE {num_episode} ENDED ({term_type}) ===\n"
+                    f"        reason: {reason_str}\n"
+                    f"        steps: {ep_steps}  return: {ep_return:+.2f}\n"
+                    f"        obs range: [{obs_min:+.2f}, {obs_max:+.2f}]  has_nan: {obs_has_nan}"
+                )
+
+        if terminated.any() or truncated.any():
+            num_episode += 1
+            ep_return = 0.0
+            ep_steps = 0
+
+            if args_cli.num_envs == 1:
+                new_obs_min = obs[0].cpu().min().item()
+                new_obs_max = obs[0].cpu().max().item()
+                new_obs_has_nan = torch.isnan(obs[0]).any().item()
+                print(
+                    f"[DEBUG] --- AFTER RESET (ep {num_episode}) ---\n"
+                    f"        obs range: [{new_obs_min:+.2f}, {new_obs_max:+.2f}]  has_nan: {new_obs_has_nan}"
+                )
+
+            if logger:
+                logger.save()
+                if num_episode >= args_cli.log:
+                    break
+
         if args_cli.video:
             timestep += 1
             if timestep == args_cli.video_length:
@@ -184,12 +278,7 @@ def main() -> None:
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-        if logger:
-            if terminated.any() or truncated.any():
-                num_episode += 1
-                logger.save()
-                if num_episode >= args_cli.log:
-                    break
+        if logger and not (terminated.any() or truncated.any()):
             logger.log(info["metrics"])
 
     env.close()
