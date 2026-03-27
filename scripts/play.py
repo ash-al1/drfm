@@ -26,6 +26,7 @@ parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO
 parser.add_argument("--real-time", action="store_true", default=False)
 parser.add_argument("--renderer", type=str, default="RayTracedLighting", choices=["RayTracedLighting", "PathTracing"])
 parser.add_argument("--log", type=int, default=None)
+parser.add_argument("--debug", action="store_true", default=False)
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -183,8 +184,8 @@ def main() -> None:
     ep_steps = 0
     prev_episode_ended = False
 
-    print(f"\n[DEBUG] Observation shape: {obs.shape}")
-    print(f"[DEBUG] Episode length: {env_cfg.episode_length_s}s")
+    print(f"[INFO] Observation shape: {obs.shape}")
+    print(f"[INFO] Episode length: {env_cfg.episode_length_s}s")
 
     while simulation_app.is_running():
         start_time = time.time()
@@ -199,80 +200,53 @@ def main() -> None:
 
         if args_cli.num_envs == 1:
             o = obs[0].cpu()
-            a = actions[0].cpu()
             r = rew[0].item()
             t = terminated[0].item()
             tr = truncated[0].item()
             ep_return += r
             ep_steps += 1
 
-            obs_min = o.min().item()
-            obs_max = o.max().item()
-            obs_has_nan = torch.isnan(o).any().item()
+            if args_cli.debug:
+                a = actions[0].cpu()
+                target_b = o[:3]
+                wp_rem = o[3]
+                quat = o[4:8]
+                lin_vel = o[8:11]
+                ang_vel = o[11:14]
+                roll, pitch, yaw = _quat_to_euler_deg(quat.tolist())
+                target_dist = torch.norm(target_b).item()
 
-            target_b = o[:3]
-            wp_rem = o[3]
-            quat = o[4:8]
-            lin_vel = o[8:11]
-            ang_vel = o[11:14]
-            roll, pitch, yaw = _quat_to_euler_deg(quat.tolist())
-            target_dist = torch.norm(target_b).item()
+                if torch.isnan(o).any().item():
+                    print(f"[DEBUG] *** NaN IN OBSERVATIONS at step {ep_steps} ***")
 
-            if obs_has_nan:
-                print(f"[DEBUG] *** NaN IN OBSERVATIONS at step {ep_steps} ***")
-
-            if ep_steps <= 3 or t or tr or ep_steps % 100 == 0:
-                print(
-                    f"[ep={num_episode} step={ep_steps:4d}] "
-                    f"pos_body=({target_b[0]:+6.1f},{target_b[1]:+6.1f},{target_b[2]:+6.1f}) "
-                    f"wp_rem={wp_rem:.2f} "
-                    f"dist={target_dist:5.1f}  "
-                    f"rpy=({roll:+6.1f},{pitch:+6.1f},{yaw:+6.1f})  "
-                    f"vel=({lin_vel[0]:+5.1f},{lin_vel[1]:+5.1f},{lin_vel[2]:+5.1f})  "
-                    f"w=({ang_vel[0]:+5.1f},{ang_vel[1]:+5.1f},{ang_vel[2]:+5.1f})  "
-                    f"act=({a[0]:+5.2f},{a[1]:+5.2f},{a[2]:+5.2f},{a[3]:+5.2f})  "
-                    f"rew={r:+7.2f}  obs=[{obs_min:+.2f},{obs_max:+.2f}]"
-                )
+                if ep_steps <= 3 or t or tr or ep_steps % 100 == 0:
+                    print(
+                        f"[ep={num_episode} step={ep_steps:4d}] "
+                        f"pos_body=({target_b[0]:+6.1f},{target_b[1]:+6.1f},{target_b[2]:+6.1f}) "
+                        f"wp_rem={wp_rem:.2f} "
+                        f"dist={target_dist:5.1f}  "
+                        f"rpy=({roll:+6.1f},{pitch:+6.1f},{yaw:+6.1f})  "
+                        f"vel=({lin_vel[0]:+5.1f},{lin_vel[1]:+5.1f},{lin_vel[2]:+5.1f})  "
+                        f"w=({ang_vel[0]:+5.1f},{ang_vel[1]:+5.1f},{ang_vel[2]:+5.1f})  "
+                        f"act=({a[0]:+5.2f},{a[1]:+5.2f},{a[2]:+5.2f},{a[3]:+5.2f})  "
+                        f"rew={r:+7.2f}"
+                    )
 
             if t or tr:
                 robot = raw_env.scene["robot"]
                 world_pos = robot.data.root_pos_w[0].cpu()
-                contact_data = raw_env.scene.sensors["collision_sensor"].data.net_forces_w
-                net_force = contact_data[0].cpu() if contact_data.numel() > 0 else torch.zeros(3)
-                contact_mag = torch.norm(net_force).item()
-
-                term_mgr = raw_env.termination_manager
-                term_details = []
-                for term_name in term_mgr.active_terms:
-                    term_val = term_mgr.get_term(term_name)
-                    triggered = term_val[0].item() if term_val.numel() > 0 else False
-                    term_details.append(f"{term_name}={int(triggered)}")
-
-                term_type = "TERMINATED" if t else "TRUNCATED"
+                wp_cmd = raw_env.command_manager.get_term("target")
                 print(
-                    f"\n[DEBUG] === EPISODE {num_episode} ENDED ({term_type}) ===\n"
-                    f"        terms: {', '.join(term_details)}\n"
-                    f"        world_pos: ({world_pos[0]:.2f}, {world_pos[1]:.2f}, {world_pos[2]:.2f})\n"
-                    f"        contact_force_mag: {contact_mag:.4f}\n"
-                    f"        steps: {ep_steps}  return: {ep_return:+.2f}"
+                    f"[ep={num_episode:3d}] {('DONE' if t else 'TIMEOUT'):<6s}  "
+                    f"steps={ep_steps:4d}  return={ep_return:+8.2f}  "
+                    f"pos=({world_pos[0]:.1f},{world_pos[1]:.1f},{world_pos[2]:.1f})  "
+                    f"wp_visited={wp_cmd._waypoints_visited[0].item()}/{wp_cmd.cfg.waypoints_per_episode}"
                 )
 
         if terminated.any() or truncated.any():
             num_episode += 1
             ep_return = 0.0
             ep_steps = 0
-
-            if args_cli.num_envs == 1:
-                robot = raw_env.scene["robot"]
-                world_pos = robot.data.root_pos_w[0].cpu()
-                contact_data = raw_env.scene.sensors["collision_sensor"].data.net_forces_w
-                net_force = contact_data[0].cpu() if contact_data.numel() > 0 else torch.zeros(3)
-                contact_mag = torch.norm(net_force).item()
-                print(
-                    f"[DEBUG] --- AFTER RESET (ep {num_episode}) ---\n"
-                    f"        world_pos: ({world_pos[0]:.2f}, {world_pos[1]:.2f}, {world_pos[2]:.2f})\n"
-                    f"        contact_force_mag: {contact_mag:.4f}"
-                )
 
             if logger:
                 logger.save()

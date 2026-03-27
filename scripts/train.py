@@ -79,15 +79,12 @@ class LoggedPPO(PPO):
     def init(self, trainer_cfg=None):
         super().init(trainer_cfg)
         if self.memory is not None:
-            self._current_log_prob = torch.zeros(self.num_envs, 1, device=self.device)
+            self._current_log_prob = torch.zeros(self.memory.num_envs, 1, device=self.device)
 
     def _update(self, timestep, timesteps):
         self._update_count += 1
         PPO._update(self, timestep, timesteps)
-
-    def _log_writer(self, tag, value, timestep):
-        self.last_metrics[tag] = value
-        PPO._log_writer(self, tag, value, timestep)
+        self.last_metrics = dict(self.tracking_data)
 
 
 def _fmt_time(seconds: float) -> str:
@@ -200,20 +197,20 @@ class EpisodeStatsWrapper(gym.Wrapper):
             if self._agent_ref and self._agent_ref[0] is not None:
                 m = self._agent_ref[0].last_metrics
                 updates = self._agent_ref[0]._update_count
-                print(
-                    f"        updates={updates}  metrics_keys={list(m.keys())}"
-                )
                 if m:
-                    pi_loss = m.get("Loss/policy_loss", 0)
-                    v_loss = m.get("Loss/value_loss", 0)
-                    entropy = m.get("Policy/entropy", 0)
-                    approx_kl = m.get("Policy/approx_kl", 0)
-                    clip_frac = m.get("Policy/clip_fraction", 0)
-                    lr = m.get("Loss/learning_rate", 0)
+                    def _avg(key):
+                        vals = m.get(key, [])
+                        return sum(vals) / len(vals) if vals else 0.0
+
+                    pi_loss = _avg("Loss / Policy loss")
+                    v_loss = _avg("Loss / Value loss")
+                    entropy = _avg("Loss / Entropy loss")
+                    lr_key = [k for k in m if "Learning rate" in k]
+                    lr = _avg(lr_key[0]) if lr_key else 0.0
                     print(
+                        f"        updates={updates}\n"
                         f"        pi_loss={pi_loss:.4f}  v_loss={v_loss:.4f}  "
-                        f"entropy={entropy:.4f}  approx_kl={approx_kl:.6f}  "
-                        f"clip={clip_frac:.3f}  lr={lr:.2e}"
+                        f"entropy={entropy:.4f}  lr={lr:.2e}"
                     )
 
             if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
@@ -280,7 +277,7 @@ def _build_agent(env, agent_cfg):
         "entropy_loss_scale":             a.get("entropy_loss_scale", 0.005),
         "value_loss_scale":               a.get("value_loss_scale", 1.0),
         "kl_threshold":                   a.get("kl_threshold", 0.0),
-        "time_limit_bootstrap":           a.get("time_limit_bootstrap", False),
+        "time_limit_bootstrap":           a.get("time_limit_bootstrap", True),
         "experiment": {
             "directory":           a["experiment"]["directory"],
             "experiment_name":     a["experiment"]["experiment_name"],
@@ -407,12 +404,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "total_timesteps": agent_cfg["trainer"]["timesteps"],
         "waypoints_per_episode": env_cfg.commands.target.waypoints_per_episode,
         "w_progress":         env_cfg.rewards.progress.weight,
+        "w_heading":          env_cfg.rewards.heading.weight,
         "w_arrived":          env_cfg.rewards.arrived.weight,
         "w_completion_bonus": env_cfg.rewards.completion_bonus.weight,
+        "w_distance_penalty": env_cfg.rewards.distance_penalty.weight,
         "w_terminating":      env_cfg.rewards.terminating.weight,
-        "w_step_penalty":  env_cfg.rewards.step_penalty.weight,
-        "w_ang_vel_l2":    env_cfg.rewards.ang_vel_l2.weight,
-        "w_proximity":     env_cfg.rewards.proximity.weight,
+        "w_step_penalty":     env_cfg.rewards.step_penalty.weight,
+        "w_ang_vel_l2":       env_cfg.rewards.ang_vel_l2.weight,
+        "w_proximity":        env_cfg.rewards.proximity.weight,
         "w_heading":       env_cfg.rewards.heading.weight,
         "terrain":         "flat",
         "obstacles":       True,

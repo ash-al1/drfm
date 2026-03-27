@@ -90,6 +90,17 @@ def step_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     return torch.ones(env.num_envs, device=env.device)
 
 
+def distance_to_goal(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    asset: object = env.scene[asset_cfg.name]
+    goal = env.command_manager.get_term(command_name).command[:, :3]
+    dist = torch.norm(asset.data.root_pos_w - goal, dim=1)
+    return dist
+
+
 def ang_vel_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     asset: object = env.scene[asset_cfg.name]
     return torch.sum(torch.square(asset.data.root_ang_vel_b), dim=1)

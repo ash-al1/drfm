@@ -173,18 +173,19 @@ class EventCfg:
 
 @configclass
 class RewardsCfg:
-    progress         = RewTerm(func=mdp.progress,          weight=20.0,   params={"command_name": "target"})
-    arrived          = RewTerm(func=mdp.arrived,            weight=400.0,  params={"command_name": "target", "threshold": 2.5})
-    completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=1000.0, params={"command_name": "target"})
-    terminating      = RewTerm(func=mdp.is_terminated,      weight=-500.0)
-    step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.001)
-    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,         weight=-0.0001)
+    progress         = RewTerm(func=mdp.progress,          weight=40.0,   params={"command_name": "target"})
+    heading          = RewTerm(func=mdp.heading_to_goal,    weight=2.0,    params={"command_name": "target"})
+    arrived          = RewTerm(func=mdp.arrived,            weight=500.0,  params={"command_name": "target", "threshold": 2.5})
+    completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=2000.0, params={"command_name": "target"})
+    distance_penalty = RewTerm(func=mdp.distance_to_goal,   weight=-0.3,   params={"command_name": "target"})
+    step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.05)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,         weight=-0.001)
     proximity        = RewTerm(
         func=mdp.proximity_penalty,
-        weight=-2.0,
+        weight=-3.0,
         params={"obstacle_names": _OBSTACLE_NAMES, "safe_dist": 2.5, "max_dist": 6.0},
     )
-    heading          = RewTerm(func=mdp.heading_to_goal,    weight=0.3,    params={"command_name": "target"})
+    terminating      = RewTerm(func=mdp.is_terminated,      weight=-500.0)
 
 
 @configclass
