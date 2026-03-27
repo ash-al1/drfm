@@ -145,7 +145,7 @@ class CommandsCfg:
         goal_y_range=(-11.0, 11.0),
         goal_z_range=(1.0, 3.5),
         waypoints_per_episode=3,
-        arrival_threshold=2.5,
+        arrival_threshold=1.0,
         obstacle_margin=2.0,
         resampling_time_range=(1e9, 1e9),
         debug_vis=True,
@@ -175,9 +175,9 @@ class EventCfg:
 class RewardsCfg:
     progress         = RewTerm(func=mdp.progress,          weight=20.0,  params={"command_name": "target"})
     heading          = RewTerm(func=mdp.heading_to_goal,    weight=1.0,   params={"command_name": "target"})
-    arrived          = RewTerm(func=mdp.arrived,            weight=500.0, params={"command_name": "target", "threshold": 2.5})
+    arrived          = RewTerm(func=mdp.arrived,            weight=500.0, params={"command_name": "target", "threshold": 1.0})
     completion_bonus = RewTerm(func=mdp.completion_bonus,   weight=1000.0, params={"command_name": "target"})
-    terminating      = RewTerm(func=mdp.is_terminated,      weight=-100.0)
+    terminating      = RewTerm(func=mdp.is_terminated,      weight=-1000.0)
     step_penalty     = RewTerm(func=mdp.step_penalty,       weight=-0.01)
     proximity        = RewTerm(
         func=mdp.proximity_penalty,
@@ -233,6 +233,6 @@ class DroneReconEnvCfg_PLAY(ManagerBasedRLEnvCfg):
         self.viewer.env_index = 0
         # Chase-cam: 3 m behind (world -x), 2 m above; look 1 m ahead of the drone.
         # eye/lookat are offsets from the drone's world position.
-        self.viewer.eye = (-3.0, 0.0, 2.0)
+        self.viewer.eye = (-4.0, 0.0, 1.0)
         self.viewer.lookat = (1.0, 0.0, 0.0)
         self.sim.render_interval = self.decimation

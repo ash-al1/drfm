@@ -1,27 +1,27 @@
+# Problem, solutions, thought processing
 
+File that contains issues, and their solutions plus thought processing. Even
+though ./docs/ contains general information on how things work we need to modify
+to fit our project ~ non-trivially.
 
+## Solutions to problems
 
-Multiple ML models under different directories
-Only best trained agent not all
-Pass type of model to train (done), PPO etc
-Pass type of neural network (not done) - all MLP right now
-
-Issues:
-    + PPO training has catastrophic forgetting R=+2 -> R=-5 permanently
-    + Whether to use training bootstrap hyperparameter or not
-        + This either caused poor training performance (not sure why), NaN
-          values (figured out action space was (-inf, inf) or was getting
-          overwritten in runtime - hardcoded this now
-
-
-Debug_viz helped solve problem:
+1.Debug_viz helped solve problem:
     + https://github.com/isaac-sim/IsaacLab/discussions/2516
     + Probably spent ~5 hours trying to fix this s...
     + Still don't know what problem is but its disappeared for now
+2. Manager based RL env hardcodes action space to (-inf, inf)
+    + Set bounded action space before passing to skrl
+3. skrl doesn't have proper good support for verbosity during training
+    + Copy tracking_data directly after each update
+4. Training bootstrap was getting injected during runtime
+    + Hardcode to False, prevents GAE causing NaNs - i don't know how/why
+5. Many training issues, catastrophic forgetting
+    + Start on easy tasks and ramp up
 
+## Thought process
 
-
-Problems:
+Question is how do we structure environment and radar + drone interaction?
 + What does drone see in rf rxr?
 + Power consumption?
 + What is drones observation space?
@@ -44,7 +44,7 @@ Problems:
     + RWR can distinguish between illumination beam and high-PRF pencil beam
 
 
-0. Training
+1. Training
     + How? ( Using Alex's comments )
         - Train both flying and DRFM together
         - Use scaffolding: idea of starting off eacy (training wheels) and
@@ -54,7 +54,7 @@ Problems:
           local extrema
 
 
-1. Define what type of radars are in use
+2. Define what type of radars are in use
     + How do they operate deterministic or stochastic?
         - Deterministisc
     + How do they exactly operate?
@@ -65,7 +65,7 @@ Problems:
         - Pulse Doppler, Search/acq., monopulse
 
 
-2. Define DRFM
+3. Define DRFM
     + How?
         - Discrete techniques, continuous variable selection
     + What is its action space?
@@ -84,7 +84,7 @@ Problems:
         - Power consumption simulation to limit RVGPO usage
 
 
-3. Drone Maneuverability:
+4. Drone Maneuverability:
     + How does drone know distance from itself to objects in multiple directions
         - Camera
     + Orientation angles
