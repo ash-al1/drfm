@@ -75,7 +75,6 @@ class LoggedPPO(PPO):
         super().__init__(*args, **kwargs)
         self.last_metrics = {}
         self._update_count = 0
-        self._nan_step = 0
 
     def init(self, trainer_cfg=None):
         super().init(trainer_cfg)
@@ -83,75 +82,13 @@ class LoggedPPO(PPO):
             self._current_log_prob = torch.zeros(self.memory.num_envs, 1, device=self.device)
 
     def record_transition(self, states, actions, rewards, next_states, terminated, truncated, infos, timestep, timesteps):
-        if self._nan_step == 0:
-            checks = [
-                ("states", states), ("actions", actions), ("rewards", rewards),
-                ("next_states", next_states), ("terminated", terminated), ("truncated", truncated),
-            ]
-            for name, t in checks:
-                if t is not None and torch.is_tensor(t) and torch.isnan(t).any():
-                    self._nan_step = timestep
-                    print(f"[NaN-TRACE] record_transition at step {timestep}: {name} has NaN! "
-                          f"shape={t.shape} dtype={t.dtype} "
-                          f"nan_count={torch.isnan(t).sum().item()}/{t.numel()}")
-
-            with torch.no_grad():
-                v, _, _ = self.value.act({"states": self._state_preprocessor(states)}, role="value")
-                if torch.isnan(v).any():
-                    self._nan_step = timestep
-                    print(f"[NaN-TRACE] value output at step {timestep} has NaN! "
-                          f"nan_count={torch.isnan(v).sum().item()}/{v.numel()}")
-
-                for name, param in self.value.named_parameters():
-                    if torch.isnan(param).any():
-                        self._nan_step = timestep
-                        print(f"[NaN-TRACE] value param '{name}' has NaN at step {timestep}")
-                        break
-                for name, param in self.policy.named_parameters():
-                    if torch.isnan(param).any():
-                        self._nan_step = timestep
-                        print(f"[NaN-TRACE] policy param '{name}' has NaN at step {timestep}")
-                        break
-
+        if timestep == 0 and torch.isnan(actions).any():
+            print(f"[ERROR] NaN actions at step 0! This should not happen with bounded action space.")
         super().record_transition(states, actions, rewards, next_states, terminated, truncated, infos, timestep, timesteps)
 
     def _update(self, timestep, timesteps):
         self._update_count += 1
-
-        values = self.memory.get_tensor_by_name("values")
-        rewards = self.memory.get_tensor_by_name("rewards")
-        log_probs = self.memory.get_tensor_by_name("log_prob")
-        print(f"[NaN-TRACE] _update #{self._update_count}: "
-              f"values_nan={torch.isnan(values).any().item()} "
-              f"rewards_nan={torch.isnan(rewards).any().item()} "
-              f"log_probs_nan={torch.isnan(log_probs).any().item()} "
-              f"values_range=[{values[~torch.isnan(values)].min().item() if (~torch.isnan(values)).any() else 'NaN':.4f}, "
-              f"{values[~torch.isnan(values)].max().item() if (~torch.isnan(values)).any() else 'NaN':.4f}] "
-              f"rewards_range=[{rewards[~torch.isnan(rewards)].min().item() if (~torch.isnan(rewards)).any() else 'NaN':.4f}, "
-              f"{rewards[~torch.isnan(rewards)].max().item() if (~torch.isnan(rewards)).any() else 'NaN':.4f}]")
-
-        orig_update = PPO._update
-        def patched_update(self_ppo, *args, **kwargs):
-            import torch.nn.functional as _F
-            result = orig_update(self_ppo, *args, **kwargs)
-            if torch.isnan(self_ppo.value.distribution(role="value").stddev.mean()):
-                print("[NaN-TRACE] value stddev is NaN after _update!")
-            return result
-        PPO._update = patched_update
-        try:
-            PPO._update(self, timestep, timesteps)
-        finally:
-            PPO._update = orig_update
-
-        for name, param in self.policy.named_parameters():
-            if torch.isnan(param).any():
-                print(f"[NaN-TRACE] policy param '{name}' has NaN AFTER update")
-                break
-        for name, param in self.value.named_parameters():
-            if torch.isnan(param).any():
-                print(f"[NaN-TRACE] value param '{name}' has NaN AFTER update")
-                break
-
+        PPO._update(self, timestep, timesteps)
         self.last_metrics = {k: list(v) for k, v in self.tracking_data.items()}
 
 
@@ -496,24 +433,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent = _build_agent(env, agent_cfg)
     _agent_ref[0] = agent
 
-    print(f"[DEBUG] Policy params: {sum(p.numel() for p in agent.policy.parameters()):,}")
-    print(f"[DEBUG] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
-    print(f"[DEBUG] obs_space: {env.observation_space}")
-    print(f"[DEBUG] act_space: {env.action_space}")
-    print(f"[DEBUG] act_space.low: {env.action_space.low}")
-    print(f"[DEBUG] act_space.high: {env.action_space.high}")
-
-    with torch.no_grad():
-        test_obs = env.observation_space.sample()
-        if hasattr(test_obs, 'shape'):
-            test_obs = torch.tensor(test_obs, device=env.device).unsqueeze(0).expand(2, -1)
-        else:
-            test_obs = torch.zeros(2, env.observation_space.shape[0], device=env.device)
-        print(f"[DEBUG] test_obs sample: shape={test_obs.shape} nan={torch.isnan(test_obs).any().item()}")
-        test_act, test_lp, test_out = agent.policy.act({"states": test_obs}, role="policy")
-        print(f"[DEBUG] policy output: act_nan={torch.isnan(test_act).any().item()} mean={test_act.mean().item():.4f}")
-        test_v, _, _ = agent.value.act({"states": test_obs}, role="value")
-        print(f"[DEBUG] value output: nan={torch.isnan(test_v).any().item()} mean={test_v.mean().item():.4f}")
+    print(f"[INFO] Policy params: {sum(p.numel() for p in agent.policy.parameters()):,}")
+    print(f"[INFO] Value  params: {sum(p.numel() for p in agent.value.parameters()):,}")
+    print(f"[INFO] obs_space: {env.observation_space}")
+    print(f"[INFO] act_space: {env.action_space}")
 
     if resume_path:
         print(f"[INFO] Resuming from: {resume_path}")
