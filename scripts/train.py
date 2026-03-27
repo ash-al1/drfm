@@ -74,6 +74,11 @@ class LoggedPPO(PPO):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.last_metrics = {}
+        self._update_count = 0
+
+    def _update(self, timestep, timesteps):
+        self._update_count += 1
+        PPO._update(self, timestep, timesteps)
 
     def _log_writer(self, tag, value, timestep):
         self.last_metrics[tag] = value
@@ -189,17 +194,22 @@ class EpisodeStatsWrapper(gym.Wrapper):
 
             if self._agent_ref and self._agent_ref[0] is not None:
                 m = self._agent_ref[0].last_metrics
-                pi_loss = m.get("Loss/policy_loss", 0)
-                v_loss = m.get("Loss/value_loss", 0)
-                entropy = m.get("Policy/entropy", 0)
-                approx_kl = m.get("Policy/approx_kl", 0)
-                clip_frac = m.get("Policy/clip_fraction", 0)
-                lr = m.get("Loss/learning_rate", 0)
+                updates = self._agent_ref[0]._update_count
                 print(
-                    f"        pi_loss={pi_loss:.4f}  v_loss={v_loss:.4f}  "
-                    f"entropy={entropy:.4f}  approx_kl={approx_kl:.6f}  "
-                    f"clip={clip_frac:.3f}  lr={lr:.2e}"
+                    f"        updates={updates}  metrics_keys={list(m.keys())}"
                 )
+                if m:
+                    pi_loss = m.get("Loss/policy_loss", 0)
+                    v_loss = m.get("Loss/value_loss", 0)
+                    entropy = m.get("Policy/entropy", 0)
+                    approx_kl = m.get("Policy/approx_kl", 0)
+                    clip_frac = m.get("Policy/clip_fraction", 0)
+                    lr = m.get("Loss/learning_rate", 0)
+                    print(
+                        f"        pi_loss={pi_loss:.4f}  v_loss={v_loss:.4f}  "
+                        f"entropy={entropy:.4f}  approx_kl={approx_kl:.6f}  "
+                        f"clip={clip_frac:.3f}  lr={lr:.2e}"
+                    )
 
             if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
                 self._best_return = mean_r
@@ -269,8 +279,8 @@ def _build_agent(env, agent_cfg):
         "experiment": {
             "directory":           a["experiment"]["directory"],
             "experiment_name":     a["experiment"]["experiment_name"],
-            "write_interval":      a["experiment"].get("write_interval", "auto"),
-            "checkpoint_interval": a["experiment"].get("checkpoint_interval", "auto"),
+            "write_interval":      1000,
+            "checkpoint_interval": a["experiment"].get("checkpoint_interval", 0),
         },
     })
     if a.get("rewards_shaper_scale") is not None:
