@@ -63,7 +63,7 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = FIVE_IN_DRONE.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     collision_sensor: ContactSensorCfg = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/.*", debug_vis=False
+        prim_path="{ENV_REGEX_NS}/Robot/.*", debug_vis=True
     )
 
     # --- Interior obstacles ---

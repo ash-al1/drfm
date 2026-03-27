@@ -1,6 +1,6 @@
 algorithm: PPO
 task: recon_phase1
-timestamp: '2026-03-26T22:09:12'
+timestamp: '2026-03-27T00:08:27'
 architecture: mlp_actor_critic
 observation_dim: 13
 action_dim: 4
@@ -17,7 +17,7 @@ gae_lambda: 0.95
 mini_batches: 8
 epochs: 5
 max_grad_norm: 1.0
-num_envs: 8192
+num_envs: 4096
 rollout_steps: 256
 total_timesteps: 50000
 w_progress: 20.0

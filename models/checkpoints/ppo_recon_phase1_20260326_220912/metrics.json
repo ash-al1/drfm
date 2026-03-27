@@ -1,8 +1,0 @@
-{
-  "best_episode_return": -4.540642255544663,
-  "best_episode_return_step": 6000,
-  "final_episode_return": -5.209215044975281,
-  "success_rate": null,
-  "total_training_steps": 50000,
-  "wall_time_seconds": 1017
-}
