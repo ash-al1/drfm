@@ -233,18 +233,28 @@ def main() -> None:
                 )
 
             if t or tr:
-                reason = []
-                if hasattr(raw_env, "episode_extras"):
-                    extras = raw_env.episode_extras
-                    for k, v in extras.items():
-                        if hasattr(v, '__len__') and len(v) > 0:
-                            val = v[0] if hasattr(v, '__getitem__') else v
-                            reason.append(f"{k}={val}")
-                reason_str = ", ".join(reason) if reason else "unknown"
+                robot = raw_env.scene["robot"]
+                world_pos = robot.data.root_pos_w[0].cpu()
+                contact_data = raw_env.scene.sensors["collision_sensor"].data.net_forces_w
+                net_force = contact_data[0].cpu() if contact_data.numel() > 0 else torch.zeros(3)
+                contact_mag = torch.norm(net_force).item()
+
+                term_mgr = raw_env.termination_manager
+                term_details = []
+                for term_name in term_mgr.available_terms:
+                    val = term_mgr.compute(term_name, env=raw_env)
+                    v = val[0].item() if val.numel() > 0 else -999
+                    if v > 0:
+                        term_details.append(f"{term_name}={v:.4f}")
+                    else:
+                        term_details.append(f"{term_name}=0")
+
                 term_type = "TERMINATED" if t else "TRUNCATED"
                 print(
                     f"\n[DEBUG] === EPISODE {num_episode} ENDED ({term_type}) ===\n"
-                    f"        reason: {reason_str}\n"
+                    f"        terms: {', '.join(term_details)}\n"
+                    f"        world_pos: ({world_pos[0]:.2f}, {world_pos[1]:.2f}, {world_pos[2]:.2f})\n"
+                    f"        contact_force_mag: {contact_mag:.4f}\n"
                     f"        steps: {ep_steps}  return: {ep_return:+.2f}\n"
                     f"        obs range: [{obs_min:+.2f}, {obs_max:+.2f}]  has_nan: {obs_has_nan}"
                 )
@@ -255,12 +265,15 @@ def main() -> None:
             ep_steps = 0
 
             if args_cli.num_envs == 1:
-                new_obs_min = obs[0].cpu().min().item()
-                new_obs_max = obs[0].cpu().max().item()
-                new_obs_has_nan = torch.isnan(obs[0]).any().item()
+                robot = raw_env.scene["robot"]
+                world_pos = robot.data.root_pos_w[0].cpu()
+                contact_data = raw_env.scene.sensors["collision_sensor"].data.net_forces_w
+                net_force = contact_data[0].cpu() if contact_data.numel() > 0 else torch.zeros(3)
+                contact_mag = torch.norm(net_force).item()
                 print(
                     f"[DEBUG] --- AFTER RESET (ep {num_episode}) ---\n"
-                    f"        obs range: [{new_obs_min:+.2f}, {new_obs_max:+.2f}]  has_nan: {new_obs_has_nan}"
+                    f"        world_pos: ({world_pos[0]:.2f}, {world_pos[1]:.2f}, {world_pos[2]:.2f})\n"
+                    f"        contact_force_mag: {contact_mag:.4f}"
                 )
 
             if logger:
