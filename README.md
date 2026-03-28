@@ -103,15 +103,14 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 ├── LICENSE
 ├── README.md
-├── pyproject.toml
 │
-├── configs/
 ├── docs/               # Thought process, task list, updates, research
 ├── media/ 
 ├── examples/           # Old tutorial for bookkeeping
 ├── scripts/            # Main run files
 │   ├── train.py
-│   └── play.py
+│   ├── play.py
+│   └── manage_replay_buffer.py  # Replay buffer rotation and inspection
 │
 ├── drfm/
 │   ├── __init__.py
@@ -125,16 +124,22 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 │   ├── algorithms/     # Classic RL algos
 │   ├── dynamics/       # Drone dynamics (Isaac drone racer)
 │   └── utils/
+│
+├── models/
+│   ├── architectures/  # Actor, Critic, SAC Critic network definitions
+│   ├── checkpoints/    # Saved model weights
+│   ├── configs/        # Saved run hyperparameter dumps
+└   └── replay_buffers/
 ```
 
 ## TODOS
 
-[ ] Rewards that take into account radar and DRFM module
-[ ] More agents for wider study
-[ ] Incorporate GNU Radio for direct RF signals
-[ ] Pull FPGA statistics, compute for DRFM usage
-[ ] Change drone to fixed wing or non-racing drone
-[ ] Change environment to be more realistic
+1. Rewards that take into account radar and DRFM module
+2. More agents for wider study
+3. Incorporate GNU Radio for direct RF signals
+4. Pull FPGA statistics, compute for DRFM usage
+5. Change drone to fixed wing or non-racing drone
+6. Change environment to be more realistic
 
 ## References
 
