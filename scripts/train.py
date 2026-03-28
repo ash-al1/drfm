@@ -36,6 +36,8 @@ parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO
 parser.add_argument("--phase", type=int, required=True)
 parser.add_argument("--wandb", action="store_true", default=False)
 parser.add_argument("--wandb_project", type=str, default="drone-recon")
+parser.add_argument("--save_buffer_interval", type=int, default=0, help="Save replay buffer snapshot every N steps (0=off, SAC only)")
+parser.add_argument("--buffer_keep_n", type=int, default=5, help="Max snapshots to keep per task after rotation")
 
 from isaaclab.app import AppLauncher
 
@@ -144,7 +146,8 @@ def plot_training_curves(log_dir: str) -> None:
 
 
 class EpisodeStatsWrapper(gym.Wrapper):
-    def __init__(self, env, print_every=1000, run_dir=None, agent_ref=None, total_timesteps=None):
+    def __init__(self, env, print_every=1000, run_dir=None, agent_ref=None, total_timesteps=None,
+                 save_buffer_interval=0, buffer_keep_n=5, algorithm="", task_slug=""):
         super().__init__(env)
         self._print_every = print_every
         self._run_dir = run_dir
@@ -161,6 +164,10 @@ class EpisodeStatsWrapper(gym.Wrapper):
         self._t_start = time.time()
         self._t_last = time.time()
         self._step_last = 0
+        self._save_buffer_interval = save_buffer_interval
+        self._buffer_keep_n = buffer_keep_n
+        self._algorithm = algorithm
+        self._task_slug = task_slug
 
     def step(self, action):
         obs, rew, terminated, truncated, info = super().step(action)
@@ -236,6 +243,21 @@ class EpisodeStatsWrapper(gym.Wrapper):
                     torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
                 agent.save(os.path.join(self._run_dir, "agent_best.pt"))
                 print(f"   >>> NEW BEST  {mean_r:+.1f}  @ step {self._step:,}  - checkpoint saved")
+
+        if (
+            self._save_buffer_interval > 0
+            and self._step % self._save_buffer_interval == 0
+            and self._agent_ref and self._agent_ref[0] is not None
+        ):
+            agent = self._agent_ref[0]
+            if hasattr(agent, "memory") and hasattr(agent.memory, "save_snapshot"):
+                from models.replay_buffers.storage import rotate, scan_snapshots
+                snap_path = agent.memory.save_snapshot(self._step, self._algorithm, self._task_slug)
+                rotate("outputs/replay_buffers", self._algorithm, self._task_slug, keep_n=self._buffer_keep_n)
+                all_snaps = scan_snapshots("outputs/replay_buffers", self._algorithm, self._task_slug)
+                mb = all_snaps[-1]["size_bytes"] / 1024 ** 2 if all_snaps else 0
+                total_gb = sum(s["size_bytes"] for s in all_snaps) / 1024 ** 3
+                print(f"   [buffer] {snap_path}  ({mb:.0f} MB snapshot, {total_gb:.2f} GB total)")
 
         return obs, rew, terminated, truncated, info
 
@@ -454,6 +476,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     stats_wrapper = EpisodeStatsWrapper(
         env, print_every=1000, run_dir=run_dir, agent_ref=_agent_ref,
         total_timesteps=agent_cfg["trainer"]["timesteps"],
+        save_buffer_interval=args_cli.save_buffer_interval,
+        buffer_keep_n=args_cli.buffer_keep_n,
+        algorithm=algorithm,
+        task_slug=slug,
     )
 
     import gymnasium as _gym

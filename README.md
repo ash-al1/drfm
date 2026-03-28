@@ -56,18 +56,18 @@ will be packaged without any regards for which phase to use.
 Navigation only: simple case of drone that navigates to three separate waypoints
 that are randomly placed within boundary walls.
 ```sh
-HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v0 --num_envs 4096 --phase 1
+HYDRA_FULL_ERROR=1 python3 scripts/train.py --task Isaac-Drone-Recon-v0 --headless --num_envs 4096 --phase 1 --algorithm SAC --save_buffer_interval 10000 --buffer_keep_n 3
 
-python scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
+python3 scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --algorithm SAC --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
 
 Navigation and DRFM: three separate radars are present one for each action space
 above sparsely located to not interfere with each other. DRFM has no direct
 connection to rewards, this needs to be thought through better.
 ```sh
-HYDRA_FULL_ERROR=1 python scripts/train.py --headless --task Isaac-Drone-Recon-v1 --num_envs 4096 --phase 2
+python3 scripts/train.py --task Isaac-Drone-Recon-v1 --headless --num_envs 2048 --phase 2 --algorithm PPO
 
-python scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
+python3 scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --algorithm PPO --debug --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
 ```
 
 ## Justification
