@@ -1,23 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Mohammad Ali
 
-"""Post-step observation logger for the DRFM drone-recon environment.
-
-Register in DroneReconEnvCfg like this:
-
-    from isaaclab.managers import EventTermCfg as EventTerm
-    import drfm.isaac.mdp as mdp
-
-    @configclass
-    class EventCfg:
-        ...
-        # Log observation components every step (disable for training runs).
-        log_observations = EventTerm(
-            func=mdp.post_step_log,
-            mode="post_step",
-        )
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

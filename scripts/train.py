@@ -28,13 +28,11 @@ parser.add_argument("--task", type=str, default="singleDRFM")
 parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--checkpoint", type=str, default=None)
 parser.add_argument("--max_iterations", type=int, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "SAC"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC"])
 parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
 
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
-
-logging.basicConfig(level=getattr(logging, args_cli.log_level), format="%(message)s")
 
 if args_cli.video:
     args_cli.enable_cameras = True
@@ -43,6 +41,8 @@ sys.argv = [sys.argv[0]] + hydra_args
 
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
+
+logging.basicConfig(level=getattr(logging, args_cli.log_level), format="%(message)s", force=True)
 
 import torch  # noqa: E402 
 
@@ -54,7 +54,7 @@ import isaaclab_tasks  # noqa: F401
 import drfm.isaac  # noqa: F401
 
 from skrl.trainers.torch import SequentialTrainer
-from drfm.agents.builder import build_ppo_agent, build_sac_agent
+from drfm.agents.builder import build_ppo_agent, build_ppo_gru_agent, build_sac_agent
 from drfm.agents.train_utils import (
     EpisodeStatsWrapper,  # noqa: F401
     create_env,
@@ -64,12 +64,13 @@ from drfm.agents.train_utils import (
 )
 
 algorithm = args_cli.algorithm.lower()
-agent_cfg_entry_point = "skrl_cfg_entry_point" if algorithm == "ppo" else f"skrl_{algorithm}_cfg_entry_point"
+agent_cfg_entry_point = "skrl_cfg_entry_point" if algorithm in ("ppo", "ppo_gru") else f"skrl_{algorithm}_cfg_entry_point"
 
 
 @hydra_task_config(args_cli.task, agent_cfg_entry_point)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: dict) -> None:
     """Entry point: wire together setup, env creation, agent training, and checkpointing."""
+    logging.basicConfig(level=getattr(logging, args_cli.log_level), format="%(message)s", force=True)
     if args_cli.num_envs is not None:
         env_cfg.scene.num_envs = args_cli.num_envs
 
@@ -87,23 +88,20 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_dir, run_dir = setup_directories(args_cli, agent_cfg, algorithm)
     env, stats_wrapper, _agent_ref = create_env(args_cli, env_cfg, agent_cfg, log_dir, run_dir, algorithm)
 
-    if algorithm == "sac":
+    if algorithm == "ppo_gru":
+        agent = build_ppo_gru_agent(env, agent_cfg)
+    elif algorithm == "sac":
         agent = build_sac_agent(env, agent_cfg)
     else:
         agent = build_ppo_agent(env, agent_cfg)
     _agent_ref[0] = agent
 
     param_count = sum(p.numel() for p in agent.policy.parameters())
-    log.info(
-        "algorithm=%s  task=%s  num_envs=%d  params=%s  device=%s\n"
-        "run_dir=%s\ntotal_timesteps=%s",
-        args_cli.algorithm.upper(),
-        args_cli.task,
-        env_cfg.scene.num_envs,
-        f"{param_count:,}",
-        str(agent.device),
-        run_dir,
-        f"{agent_cfg['trainer']['timesteps']:,}",
+    print(
+        f"algorithm={args_cli.algorithm.upper()}  task={args_cli.task}"
+        f"  num_envs={env_cfg.scene.num_envs}  params={param_count:,}  device={agent.device}\n"
+        f"run_dir={run_dir}\ntotal_timesteps={agent_cfg['trainer']['timesteps']:,}",
+        flush=True,
     )
 
     save_hyperparams(env, env_cfg, agent_cfg, args_cli, run_dir, algorithm)
@@ -116,7 +114,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     SequentialTrainer(
         cfg={
             "timesteps": agent_cfg["trainer"]["timesteps"],
-            "environment_info": agent_cfg["trainer"].get("environment_info", "log"),
+            "environment_info": agent_cfg["trainer"].get("environment_info", "episode"),
             "close_environment_at_exit": False,
         },
         env=env,

@@ -32,13 +32,13 @@ class SharedMLP(GaussianMixin, DeterministicMixin, Model):
 
     def __init__(self, observation_space, action_space, device,
                  hidden_sizes=(256, 256, 256), activation="elu"):
-        Model.__init__(self, observation_space, action_space, device)
+        Model.__init__(self, observation_space=observation_space, action_space=action_space, device=device)
         GaussianMixin.__init__(self, clip_actions=False, clip_log_std=True,
                                 min_log_std=-20.0, max_log_std=2.0, reduction="sum", role="policy")
         DeterministicMixin.__init__(self, clip_actions=False, role="value")
 
-        obs_dim = self.observation_space.shape[0]
-        act_dim = self.action_space.shape[0]
+        obs_dim = self.num_observations
+        act_dim = self.num_actions
         feat_dim = hidden_sizes[-1]
 
         act_cls = _ACTIVATIONS[activation.lower()]
@@ -62,9 +62,9 @@ class SharedMLP(GaussianMixin, DeterministicMixin, Model):
         return DeterministicMixin.act(self, inputs, role)
 
     def compute(self, inputs, role):
-        features = self.backbone(inputs["states"])
+        features = self.backbone(inputs["observations"])
         if role == "policy":
-            return self.policy_head(features), self.log_std_parameter, {}
+            return self.policy_head(features), {"log_std": self.log_std_parameter}
         return self.value_head(features), {}
 
 
@@ -72,34 +72,34 @@ class MLPActor(GaussianMixin, Model):
     def __init__(self, observation_space, action_space, device,
                  hidden_sizes=(256, 256, 256), activation="elu",
                  clip_actions=False, clip_log_std=True, min_log_std=-20.0, max_log_std=2.0):
-        Model.__init__(self, observation_space, action_space, device)
-        GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std)
-        self.net = _build_mlp(self.observation_space.shape[0], self.action_space.shape[0], hidden_sizes, activation, layer_norm=True)
-        self.log_std_parameter = nn.Parameter(torch.zeros(self.action_space.shape[0]))
+        Model.__init__(self, observation_space=observation_space, action_space=action_space, device=device)
+        GaussianMixin.__init__(self, clip_actions=clip_actions, clip_log_std=clip_log_std, min_log_std=min_log_std, max_log_std=max_log_std)
+        self.net = _build_mlp(self.num_observations, self.num_actions, hidden_sizes, activation, layer_norm=True)
+        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
 
     def compute(self, inputs, role):
-        return self.net(inputs["states"]), self.log_std_parameter, {}
+        return self.net(inputs["observations"]), {"log_std": self.log_std_parameter}
 
 
 class MLPCritic(DeterministicMixin, Model):
     def __init__(self, observation_space, action_space, device,
                  hidden_sizes=(256, 256, 256), activation="elu", clip_actions=False):
-        Model.__init__(self, observation_space, action_space, device)
-        DeterministicMixin.__init__(self, clip_actions)
-        self.net = _build_mlp(self.observation_space.shape[0], 1, hidden_sizes, activation, layer_norm=True)
+        Model.__init__(self, observation_space=observation_space, action_space=action_space, device=device)
+        DeterministicMixin.__init__(self, clip_actions=clip_actions)
+        self.net = _build_mlp(self.num_observations, 1, hidden_sizes, activation, layer_norm=True)
 
     def compute(self, inputs, role):
-        return self.net(inputs["states"]), {}
+        return self.net(inputs["observations"]), {}
 
 
 class MLPSACCritic(DeterministicMixin, Model):
     def __init__(self, observation_space, action_space, device,
                  hidden_sizes=(256, 256, 256), activation="elu", clip_actions=False):
-        Model.__init__(self, observation_space, action_space, device)
-        DeterministicMixin.__init__(self, clip_actions)
-        input_dim = self.observation_space.shape[0] + self.action_space.shape[0]
+        Model.__init__(self, observation_space=observation_space, action_space=action_space, device=device)
+        DeterministicMixin.__init__(self, clip_actions=clip_actions)
+        input_dim = self.num_observations + self.num_actions
         self.net = _build_mlp(input_dim, 1, hidden_sizes, activation, layer_norm=True)
 
     def compute(self, inputs, role):
-        x = torch.cat([inputs["states"], inputs["taken_actions"]], dim=-1)
+        x = torch.cat([inputs["observations"], inputs["taken_actions"]], dim=-1)
         return self.net(x), {}

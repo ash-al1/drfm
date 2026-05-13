@@ -4,9 +4,48 @@ File that contains issues, and their solutions plus thought processing. Even
 though ./docs/ contains general information on how things work we need to modify
 to fit our project ~ non-trivially.
 
-## Solutions to problems
+## V3 Problems and solutions
 
-1.Debug_viz helped solve problem:
+1. Fixed proximity penalty given we calculate distance to objects properly
+    - Remove outer boundary walls from proximity penalty, there already is a
+      termination on them ; penalty applied on drones spawning next to walls
+    - Upper bound clamp added
+1. Migrate SKRL 1.4.3 -> 2.1.0 for PPO RNN implementation
+    - Replace custom messed up GRU hidden state with SKRLs built in PPO RNN,
+      this has get_specification() and proper auto hidden state management
+    - Change builder/train/play to proper calls now, PPO_CFG, keyword inits and
+      critically 2-tuple compute/act returns, observations input key,
+      ExperimentCfg and SAC_CFG
+    - Add new PPO_GRU option to train and play instead of bolting to old PPO
+1. Altitude is an issue, drone flies into ground or upper limit to terminate
+   because distance penalty causing agent to learn to die faster to accumulate
+   less rewards
+   - Completely remove distance penalty
+   - Added ground limit similar to max_z, min_z terminates agent 0.3m from
+     ground
+   - This change is more non-trivial than I thought, adding altitude band and
+     penalizing doesn't solve, adding only ground penalty doesn't solve.
+   - This also kicks up our need to train for longer ... not ideal.
+1. Interaction of agent to objects in the environment feels like im making a
+   video game
+   - Slab intersection calculating for LoS between radar and drone
+   - Calculate distance between center of obstacle to surface, and distance to
+     drone
+1. Thrust is a quadratic value in mdp/actions.py problem is our actions are
+   linear
+   - PPO uses gaussian policy, we see differences in training and inference when
+     running train.py or play.py
+   - I think whats going on is the noise in training pushes drone above ground
+     enough for it to continue forward, but during inference that noise does not
+     exist. Change thrust to be linear in action
+1. I hate reward shaping so much ; small changes in values completely changes
+   agent outcome ; very fragile and clunky to work with.
+   - Adding more metrics, debugging during training helps shed some light in
+   black box a lot
+
+## V1/V2 Solutions
+
+1. Debug_viz helped solve problem:
     + https://github.com/isaac-sim/IsaacLab/discussions/2516
     + Probably spent ~5 hours trying to fix this s...
     + Still don't know what problem is but its disappeared for now
@@ -36,13 +75,13 @@ Question is how do we structure environment and radar + drone interaction?
     + File of what the mission entails: start, checkpoint and final positions
     + Include intermediate tasks, i.e. hover over a location for X time
 
+---
 
 0. DRFM and Radar glue
     + Threat library matches fingerprint against mission data files
     + RWR measures signal parameters (PRF, Fc, Pulse width, scan pattern,
       polarization) then matches to threat library.
     + RWR can distinguish between illumination beam and high-PRF pencil beam
-
 
 1. Training
     + How? ( Using Alex's comments )
@@ -53,7 +92,6 @@ Question is how do we structure environment and radar + drone interaction?
         - Avoid gradual learning because moving loss function prevents finding
           local extrema
 
-
 2. Define what type of radars are in use
     + How do they operate deterministic or stochastic?
         - Deterministisc
@@ -63,7 +101,6 @@ Question is how do we structure environment and radar + drone interaction?
         - They have to, to allow drone to trigger different movement & DRFM
     + What kind of radars?
         - Pulse Doppler, Search/acq., monopulse
-
 
 3. Define DRFM
     + How?
@@ -83,7 +120,6 @@ Question is how do we structure environment and radar + drone interaction?
     + Limitations?
         - Power consumption simulation to limit RVGPO usage
 
-
 4. Drone Maneuverability:
     + How does drone know distance from itself to objects in multiple directions
         - Camera
@@ -96,7 +132,6 @@ Question is how do we structure environment and radar + drone interaction?
     + Penalties and rewards:
         - urge to finish quick, urge to take best orientation/angles, penalize
           for risky decisions (too close to objects)
-
 
 ## Radar & DRFM Interaction
 

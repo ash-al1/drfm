@@ -23,7 +23,7 @@ parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--num_envs", type=int, default=None)
 parser.add_argument("--task", type=str, default="singleDRFM")
 parser.add_argument("--checkpoint", type=str, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO", "SAC"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC"])
 parser.add_argument("--real-time", action="store_true", default=False)
 parser.add_argument("--renderer", type=str, default="RayTracedLighting", choices=["RayTracedLighting", "PathTracing"])
 parser.add_argument("--debug", action="store_true", default=False)
@@ -49,7 +49,7 @@ import drfm.isaac  # noqa: F401
 
 logging.basicConfig(level=logging.DEBUG if args_cli.debug else logging.INFO, format="%(message)s", force=True)
 
-from drfm.agents.builder import build_ppo_agent, build_sac_agent
+from drfm.agents.builder import build_ppo_agent, build_ppo_gru_agent, build_sac_agent
 from drfm.agents.play_utils import CameraFollower
 
 log = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ def _quat_to_euler_deg(q):
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.DEBUG if args_cli.debug else logging.INFO, format="%(message)s", force=True)
     env_cfg = parse_env_cfg(
         args_cli.task,
         device=args_cli.device,
@@ -127,10 +128,14 @@ def main() -> None:
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     env = SkrlVecEnvWrapper(env, ml_framework="torch")
-    if algorithm == "sac":
+    if algorithm == "ppo_gru":
+        agent = build_ppo_gru_agent(env, experiment_cfg, training=False)
+    elif algorithm == "sac":
         agent = build_sac_agent(env, experiment_cfg, training=False)
     else:
         agent = build_ppo_agent(env, experiment_cfg, training=False)
+
+    agent.init()
 
     if resume_path:
         log.info("Loading checkpoint: %s", resume_path)
@@ -138,7 +143,7 @@ def main() -> None:
     else:
         log.warning("No checkpoint found - running with untrained policy.")
 
-    agent.set_running_mode("eval")
+    agent.enable_models_training_mode(enabled=False)
 
     obs, _ = env.reset()
     timestep = 0
@@ -163,11 +168,11 @@ def main() -> None:
             cam.update(_pre_pos.numpy())
 
         with torch.inference_mode():
-            outputs = agent.act(obs, timestep=0, timesteps=0)
+            actions, outputs = agent.act(obs, states=None, timestep=0, timesteps=0)
             if hasattr(env, "possible_agents"):
-                actions = {a: outputs[-1][a].get("mean_actions", outputs[0][a]) for a in env.possible_agents}
+                actions = {a: outputs[a].get("mean_actions", actions) for a in env.possible_agents}
             else:
-                actions = outputs[-1].get("mean_actions", outputs[0])
+                actions = outputs.get("mean_actions", actions)
             obs, rew, terminated, truncated, info = env.step(actions)
 
         if args_cli.num_envs == 1:
@@ -192,14 +197,13 @@ def main() -> None:
                 phase2    = _pre_obs.shape[0] >= PHASE2_MIN_OBS_DIM
 
                 if torch.isnan(_pre_obs).any().item():
-                    log.error("NaN in observations  ep=%d  s=%d", num_episode, ep_steps)
+                    print(f"NaN in observations  ep={num_episode}  s={ep_steps}", flush=True)
 
                 if ep_steps <= 3 or ep_steps % 100 == 0:
-                    log.debug(
-                        "ep=%d  s=%4d  alt=%4.1f  dist=%5.1f  wp=%d/%d  "
-                        "yaw=%+6.1f  spd=%4.1f  angv=%4.1f  rew=%+7.2f",
-                        num_episode, ep_steps, alt, dist, wp_rem, wp_total,
-                        yaw, spd, angv, r,
+                    print(
+                        f"ep={num_episode}  |  s={ep_steps}  |  alt={alt:.1f}  |  dist={dist:.1f}  |  wp={wp_rem}/{wp_total}"
+                        f"  |  yaw={yaw:+.1f}  |  spd={spd:.1f}  |  angv={angv:.1f}  |  rew={r:+.2f}",
+                        flush=True,
                     )
 
                     if phase2:
@@ -224,20 +228,29 @@ def main() -> None:
                         elif tech == 3:
                             param_str = f"  por={por:.0f}  vpor={vpor:.0f}"
                         pwr_str = f"{pwr*100:.0f}%" if pwr > 0.0 else "DEPLETED"
-                        log.debug(
-                            "         radar  %s\n         drfm   %s%s  pwr=%s",
-                            "  |  ".join(radar_parts), _TECH[tech], param_str, pwr_str,
+                        print(
+                            f"         radar  {'  |  '.join(radar_parts)}\n         drfm   {_TECH[tech]}{param_str}  pwr={pwr_str}",
+                            flush=True,
                         )
 
             if t or tr:
                 # Use pre-step state - post-step is already the next episode.
                 wp_done = wp_total - int(round(_pre_obs[3].item() * wp_total))
                 outcome = "SUCCESS" if t and wp_done >= wp_total else ("KILLED" if t else "TIMEOUT")
-                log.info(
-                    "ep=%3d  %s  steps=%4d  return=%+8.2f  wp=%d/%d  pos=(%.1f,%.1f,%.1f)",
-                    num_episode, outcome, ep_steps, ep_return,
-                    wp_done, wp_total,
-                    _pre_pos[0], _pre_pos[1], _pre_pos[2],
+
+                tm = raw_env.termination_manager
+                fired = [
+                    tm._term_names[i]
+                    for i in range(len(tm._term_names))
+                    if tm._term_dones[0, i].item()
+                ]
+                term_str = ", ".join(fired) if fired else "unknown"
+
+                print(
+                    f"ep={num_episode}  |  {outcome}  |  steps={ep_steps}  |  ret={ep_return:+.2f}"
+                    f"  |  wp={wp_done}/{wp_total}  |  pos=({_pre_pos[0]:.1f},{_pre_pos[1]:.1f},{_pre_pos[2]:.1f})"
+                    f"  |  term=[{term_str}]",
+                    flush=True,
                 )
 
         if terminated.any() or truncated.any():

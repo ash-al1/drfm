@@ -1,9 +1,7 @@
 # Tasks:
 
 + Add SKRL multi agent
-+ Use offline stored IQ waveforms
-+ Reward shaping for managing radar state
-    - this needs research
++ 
 + POMDP - RWR and radar have info when they should not
     - fix rwr\_observations
     - agent infers radar state from signal behavior instead
@@ -76,6 +74,11 @@
 
 ## V3
 
++ Calculate distance from drone to objects properly (to surface, not center)
++ Better outputs, accumulated terminations, and other metrics printed on train
++ Terminate when too close to ground
++ Better rewards in general
+    - remove distance penalty, robot learned to die faster to get less negatives
 + Remove CSVLogger() which does plots(?) idk
 + Add --log-level in train, remove debug interval
 + Remove redundant debugs/printing in train and switch to tensorboard

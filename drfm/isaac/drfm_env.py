@@ -47,6 +47,16 @@ _OBSTACLE_GEOM = (
 )
 
 
+# AABB footprints (cx, cy, half_x, half_y) in env-local coords, matching scene geometry above.
+# Walls are excluded — wall proximity is handled by collision termination.
+_OBSTACLE_FOOTPRINTS: dict[str, tuple[float, float, float, float]] = {
+    "obstacle_center": (25.0,   0.0, 4.0,  1.5),
+    "obstacle_n1":     (20.0,   9.0, 2.0,  1.5),
+    "obstacle_n2":     (33.0,  10.0, 1.5,  2.0),
+    "obstacle_s1":     (18.0,  -8.0, 1.5,  2.0),
+    "obstacle_s2":     (32.0,  -6.0, 2.0,  1.5),
+}
+
 _NUM_ROBOTS = 2   # increment here when adding more drones to the scene
 
 
@@ -88,6 +98,7 @@ def _drone_slot(index: int) -> tuple[ArticulationCfg, ContactSensorCfg]:
 
 
 def _radar_cone(prim: str, xy, radius: float, height: float, diffuse, emissive) -> RigidObjectCfg:
+    """Creates a cone shaped object to visualize position of radar."""
     x, y = xy
     return RigidObjectCfg(
         prim_path=prim,
@@ -115,9 +126,11 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.GroundPlaneCfg(color=(0.2, 0.35, 0.2)),
     )
 
+    # Create drone robots
     robot,   collision_sensor   = _drone_slot(0)
     robot_1, collision_sensor_1 = _drone_slot(1)
 
+    # Obstacles
     obstacle_center: RigidObjectCfg = _box(
         "{ENV_REGEX_NS}/ObstacleCenter", (8.0, 3.0, 6.0), (25.0,  0.0, 3.0), (0.50, 0.45, 0.40)
     )
@@ -133,7 +146,8 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
     obstacle_s2: RigidObjectCfg = _box(
         "{ENV_REGEX_NS}/ObstacleS2",     (4.0, 3.0, 5.0), (32.0, -6.0, 2.5), (0.55, 0.50, 0.45)
     )
-
+    
+    # Boxed boundary environment
     wall_west:  RigidObjectCfg = _box(
         "{ENV_REGEX_NS}/WallWest",  ( 1.0, 32.0, 10.0), ( 0.0,   0.0, 5.0), (0.45, 0.45, 0.45),
     )
@@ -147,6 +161,7 @@ class DroneReconSceneCfg(InteractiveSceneCfg):
         "{ENV_REGEX_NS}/WallSouth", (52.0,  1.0, 10.0), (25.0, -16.0, 5.0), (0.45, 0.45, 0.45),
     )
 
+    # Create lighting
     sun = AssetBaseCfg(
         prim_path="/World/Sun",
         spawn=sim_utils.DistantLightCfg(color=(1.0, 0.95, 0.85), intensity=2500.0),
@@ -248,28 +263,31 @@ class ObservationsCfg:
 
 @configclass
 class RewardsCfg:
-    progress         = RewTerm(func=mdp.progress,         weight=20.0,   params={"command_name": "target"})
-    forward_speed    = RewTerm(func=mdp.forward_speed,     weight=8.0,    params={"command_name": "target", "target_speed": 4.0})
-    heading          = RewTerm(func=mdp.heading_to_goal,   weight=4.0,    params={"command_name": "target"})
-    arrived          = RewTerm(func=mdp.arrived,           weight=50.0,  params={"command_name": "target", "threshold": 1.0})
-    completion_bonus = RewTerm(func=mdp.completion_bonus,  weight=100.0, params={"command_name": "target"})
-    distance_penalty = RewTerm(func=mdp.distance_to_goal,  weight=-0.5,   params={"command_name": "target"})
-    terminating      = RewTerm(func=mdp.is_terminated,     weight=-500.0)
+    progress         = RewTerm(func=mdp.progress,         weight=5.0,   params={"command_name": "target"})
+    forward_speed    = RewTerm(func=mdp.forward_speed,     weight=2.0,  params={"command_name": "target", "target_speed": 2.5})
+    heading          = RewTerm(func=mdp.heading_to_goal,   weight=2.0,  params={"command_name": "target"})
+    waypoint_reached = RewTerm(func=mdp.waypoint_reached,  weight=50.0, params={"command_name": "target"})
+    completion_bonus = RewTerm(func=mdp.completion_bonus,  weight=100.0,params={"command_name": "target"})
+    upright          = RewTerm(func=mdp.upright_bonus,     weight=1.0)
+    altitude_hold    = RewTerm(func=mdp.altitude_hold,     weight=1.0,  params={"target_z": 2.0, "tolerance": 1.0})
+    terminating      = RewTerm(func=mdp.is_terminated,     weight=-200.0)
     step_penalty     = RewTerm(func=mdp.step_penalty,      weight=-0.01)
-    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,        weight=-0.01)
-    proximity        = RewTerm(func=mdp.proximity_penalty, weight=-10.0,
-                               params={"obstacle_names": _OBSTACLE_NAMES, "safe_dist": 2.5, "max_dist": 6.0})
-    illumination_low  = RewTerm(func=mdp.illumination_penalty, weight=-5.0)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,        weight=-0.02)
+    action_smooth    = RewTerm(func=mdp.action_smoothness, weight=-0.01)
+    proximity        = RewTerm(func=mdp.proximity_penalty, weight=-3.0, params={"obstacle_footprints": _OBSTACLE_FOOTPRINTS, "safe_dist": 2.5, "max_dist": 6.0})
+    illumination_low  = RewTerm(func=mdp.illumination_penalty, weight=-2.0)
     power_conserve    = RewTerm(func=mdp.power_conserve,       weight=0.5)
+    drfm_effective    = RewTerm(func=mdp.drfm_effectiveness,   weight=2.0)
+    smart_jam         = RewTerm(func=mdp.smart_jamming,        weight=1.0)
 
 
 @configclass
 class TerminationsCfg:
     time_out      = DoneTerm(func=mdp.time_out,           time_out=True)
-    all_waypoints = DoneTerm(func=mdp.all_waypoints_done, params={"command_name": "target"})
+    all_waypoints = DoneTerm(func=mdp.all_waypoints_done, time_out=True, params={"command_name": "target"})
     collision     = DoneTerm(func=mdp.illegal_contact,    params={"sensor_cfg": SceneEntityCfg("collision_sensor"), "threshold": 0.01})
-    flyaway       = DoneTerm(func=mdp.flyaway,            params={"command_name": "target", "distance": 50.0})
-    too_high      = DoneTerm(func=mdp.too_high,           params={"max_z": 4.0})
+    too_high      = DoneTerm(func=mdp.too_high,           params={"max_z": 10.0})
+    too_low       = DoneTerm(func=mdp.too_low,            params={"min_z": 0.3})
     radar_lock    = DoneTerm(func=mdp.radar_lock)
 
 

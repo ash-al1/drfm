@@ -82,7 +82,8 @@ class ControlAction(ActionTerm):
         self._raw_actions[:] = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         clamped = self._raw_actions.clamp_(-1.0, 1.0)
         mapped = (clamped + 1.0) / 2.0
-        omega_ref = self.cfg.omega_max * mapped
+        # Thrust is proportional to omega^2, so sqrt maps linear action -> linear thrust.
+        omega_ref = self.cfg.omega_max * torch.sqrt(mapped)
         omega_real = self._motor.compute(omega_ref)
         self._processed_actions = self._allocation.compute(omega_real)
 

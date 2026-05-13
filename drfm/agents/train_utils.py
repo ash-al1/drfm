@@ -57,12 +57,28 @@ class EpisodeStatsWrapper(gym.Wrapper):
         self._window_steps: int = 0
         self._tech_counts: list[float] = [0.0, 0.0, 0.0, 0.0]  # OFF, RGPO, VGPO, RVGPO
         self._illum_window: float = 0.0
+        self._reward_accum: dict[str, float] = {}
+        self._term_counts: dict[str, int] = {}
 
     def step(self, action: Any) -> tuple:
         """Step the environment and accumulate episode statistics."""
         obs, rew, terminated, truncated, info = super().step(action)
         self._step += 1
         self._window_steps += 1
+
+        rl_env = self.env
+        while hasattr(rl_env, "env"):
+            rl_env = rl_env.env
+        if hasattr(rl_env, "reward_manager"):
+            rm = rl_env.reward_manager
+            for i, name in enumerate(rm._term_names):
+                val = rm._step_reward[:, i].mean().item()
+                self._reward_accum[name] = self._reward_accum.get(name, 0.0) + val
+        if hasattr(rl_env, "termination_manager"):
+            tm = rl_env.termination_manager
+            for i, name in enumerate(tm._term_names):
+                count = int(tm._term_dones[:, i].sum().item())
+                self._term_counts[name] = self._term_counts.get(name, 0) + count
 
         if self._current_returns is None:
             self._current_returns = torch.zeros_like(rew)
@@ -113,31 +129,40 @@ class EpisodeStatsWrapper(gym.Wrapper):
         std_r = (sum((r - mean_r) ** 2 for r in episode_returns) / len(episode_returns)) ** 0.5
         timeout_rate = sum(self._ep_timeouts) / len(self._ep_timeouts)
         mean_ep_len = sum(self._ep_lengths) / len(self._ep_lengths)
-        lock_rate = self._lock_steps_window / max(self._window_steps, 1)
+        window_steps = self._window_steps
+        lock_rate = self._lock_steps_window / max(window_steps, 1)
         tech_total = sum(self._tech_counts) or 1.0
         tech_fracs = [c / tech_total for c in self._tech_counts]
-        illum_mean = self._illum_window / max(self._window_steps, 1)
+        illum_mean = self._illum_window / max(window_steps, 1)
 
         self._lock_steps_window = 0.0
         self._window_steps = 0
         self._tech_counts = [0.0, 0.0, 0.0, 0.0]
         self._illum_window = 0.0
+        reward_accum = self._reward_accum
+        term_counts = self._term_counts
+        self._reward_accum = {}
+        self._term_counts = {}
 
         if self._total_timesteps:
             pct = 100.0 * self._step / self._total_timesteps
-            eta = (self._total_timesteps - self._step) / max(fps, 1)
             progress = f"{self._step:,}/{self._total_timesteps:,} ({pct:.0f}%)"
-            eta_str = f"eta {int(eta // 60)}m{int(eta % 60):02d}s"
         else:
             progress = f"step {self._step:,}"
-            eta_str = ""
 
         elapsed_str = f"{int(elapsed // 60)}m{int(elapsed % 60):02d}s"
         best_str = f"{self._best_return:+.1f}" if self._best_return > -float("inf") else "n/a"
 
-        log.info(
-            "%s  |  %s fps  |  ret %+.1f+-%.1f  |  best %s  |  %s  %s",
-            progress, f"{fps:,.0f}", mean_r, std_r, best_str, elapsed_str, eta_str,
+        _tech_names = ["off", "rgpo", "vgpo", "rvgpo"]
+        tech_str = "  ".join(f"{n}:{f:.0%}" for n, f in zip(_tech_names, tech_fracs))
+        print(
+            f"{progress}  |  {fps:,.0f} fps  |  ret {mean_r:+.1f}±{std_r:.1f}"
+            f"  |  best {best_str}  |  ep_len {mean_ep_len:.0f}"
+            f"  |  lock {lock_rate:.0%}  timeout {timeout_rate:.0%}"
+            f"  |  illum {illum_mean:.3f}"
+            f"  |  tech [{tech_str}]"
+            f"  |  {elapsed_str}",
+            flush=True,
         )
 
         # Write windowed episode stats to env.extras["metrics"] so skrl logs them to TensorBoard.
@@ -148,9 +173,19 @@ class EpisodeStatsWrapper(gym.Wrapper):
         metrics["train/timeout_rate"] = torch.tensor(timeout_rate)
         metrics["train/mean_ep_length"] = torch.tensor(mean_ep_len)
         metrics["train/illumination_penalty"] = torch.tensor(illum_mean)
-        _tech_names = ["off", "rgpo", "vgpo", "rvgpo"]
         for name, frac in zip(_tech_names, tech_fracs):
             metrics[f"train/tech_{name}"] = torch.tensor(frac)
+
+        if reward_accum:
+            steps = max(window_steps, 1)
+            parts = sorted(reward_accum.items(), key=lambda x: abs(x[1]), reverse=True)
+            rew_str = "  ".join(f"{k}:{v/steps:+.2f}" for k, v in parts)
+            print(f"  rewards/step: {rew_str}", flush=True)
+
+        if term_counts:
+            term_str = "  ".join(f"{k}:{v}" for k, v in term_counts.items() if v > 0)
+            if term_str:
+                print(f"  terminations: {term_str}", flush=True)
 
         if self._run_dir and self._agent_ref and self._agent_ref[0] is not None and mean_r > self._best_return:
             self._best_return = mean_r
@@ -160,7 +195,7 @@ class EpisodeStatsWrapper(gym.Wrapper):
             if hasattr(agent, "value"):
                 torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
             agent.save(os.path.join(self._run_dir, "agent_best.pt"))
-            log.info("new best  %+.1f  @ step %s  -- checkpoint saved", mean_r, f"{self._step:,}")
+            print(f"  new best  {mean_r:+.1f}  @ step {self._step:,}  -- checkpoint saved", flush=True)
 
 
 def task_slug(task: str) -> str:
@@ -288,7 +323,7 @@ def save_hyperparams(
         "waypoints_per_episode": env_cfg.commands.target.waypoints_per_episode,
         "w_progress": env_cfg.rewards.progress.weight,
         "w_heading": env_cfg.rewards.heading.weight,
-        "w_arrived": env_cfg.rewards.arrived.weight,
+        "w_waypoint_reached": env_cfg.rewards.waypoint_reached.weight,
         "w_completion_bonus": env_cfg.rewards.completion_bonus.weight,
         "w_terminating": env_cfg.rewards.terminating.weight,
         "w_step_penalty": env_cfg.rewards.step_penalty.weight,
@@ -335,12 +370,12 @@ def save_final_checkpoint(agent: Any, stats_wrapper: EpisodeStatsWrapper, run_di
     with open(os.path.join(run_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
 
-    log.info(
-        "done  wall=%dm%02ds  final_ret=%s  best=%s @ step %s  checkpoint=%s",
-        wall // 60,
-        wall % 60,
-        f"{final_return:+.1f}" if final_return is not None else "n/a",
-        f"{best:+.1f}" if best is not None else "n/a",
-        f"{stats_wrapper._best_step:,}" if best is not None else "n/a",
-        os.path.join(run_dir, "agent_final.pt"),
+    final_str = f"{final_return:+.1f}" if final_return is not None else "n/a"
+    best_str  = f"{best:+.1f}" if best is not None else "n/a"
+    step_str  = f"{stats_wrapper._best_step:,}" if best is not None else "n/a"
+    print(
+        f"done  wall={wall // 60}m{wall % 60:02d}s  final_ret={final_str}"
+        f"  best={best_str} @ step {step_str}"
+        f"  checkpoint={os.path.join(run_dir, 'agent_final.pt')}",
+        flush=True,
     )

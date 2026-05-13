@@ -38,6 +38,6 @@ agent:
     write_interval: 250
     checkpoint_interval: 0
 trainer:
-  timesteps: 5000
+  timesteps: 10000
   environment_info: metrics
   close_environment_at_exit: false
