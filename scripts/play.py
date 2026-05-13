@@ -1,14 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mohammad Ali
 #
-#
-# Usage:
-#   python3 scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1
-#   python3 scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --checkpoint path/to/model.pt
+# Copyright (c) 2025, Kousheek Chakraborty
+# Original work licensed under the BSD-3-Clause License.
+# Built on the IsaacLab framework (https://github.com/isaac-sim/IsaacLab).
 
 import argparse
 import glob
+import logging
 import math
 import os
-import sys
 import time
 
 import gymnasium as gym
@@ -20,12 +21,11 @@ parser.add_argument("--video", action="store_true", default=False)
 parser.add_argument("--video_length", type=int, default=200)
 parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--num_envs", type=int, default=None)
-parser.add_argument("--task", type=str, default=None)
+parser.add_argument("--task", type=str, default="singleDRFM")
 parser.add_argument("--checkpoint", type=str, default=None)
 parser.add_argument("--algorithm", type=str, default="PPO", choices=["AMP", "PPO", "IPPO", "MAPPO", "SAC"])
 parser.add_argument("--real-time", action="store_true", default=False)
 parser.add_argument("--renderer", type=str, default="RayTracedLighting", choices=["RayTracedLighting", "PathTracing"])
-parser.add_argument("--log", type=int, default=None)
 parser.add_argument("--debug", action="store_true", default=False)
 
 AppLauncher.add_app_launcher_args(parser)
@@ -39,23 +39,24 @@ simulation_app = app_launcher.app
 
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import isaaclab_tasks  # noqa: F401
 from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.dict import print_dict
 from isaaclab_rl.skrl import SkrlVecEnvWrapper
 from isaaclab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 
-import drfm.envs.isaac  # noqa: F401
-from utils.logger import CSVLogger
+import drfm.isaac  # noqa: F401
 
-from skrl.agents.torch.ppo import PPO, PPO_DEFAULT_CONFIG
-from skrl.agents.torch.sac import SAC, SAC_DEFAULT_CONFIG
-from skrl.memories.torch import RandomMemory
-from skrl.resources.preprocessors.torch import RunningStandardScaler
-from models.architectures.mlp_actor_critic import MLPActor, MLPCritic, MLPSACCritic
+logging.basicConfig(level=logging.DEBUG if args_cli.debug else logging.INFO, format="%(message)s", force=True)
+
+from drfm.agents.builder import build_ppo_agent, build_sac_agent
+from drfm.agents.play_utils import CameraFollower
+
+log = logging.getLogger(__name__)
+
+# Phase-2 obs includes base(14) + 3 radars×10 + drfm_state(8) = 52 dims minimum,
+# but the last accessed index is 61 (drfm power), so phase-2 obs dim >= 62.
+PHASE2_MIN_OBS_DIM = 62
 
 algorithm = args_cli.algorithm.lower()
 
@@ -65,84 +66,10 @@ def _resolve_checkpoint() -> str | None:
         return os.path.abspath(args_cli.checkpoint)
     for pattern in ("agent_best.pt", "agent_final.pt"):
         candidates = sorted(glob.glob(os.path.join("models", "checkpoints", "*", pattern)))
-        if candidates:
-            return candidates[-1]
+        matching = [c for c in candidates if os.path.basename(os.path.dirname(c)).startswith(algorithm)]
+        if matching:
+            return matching[-1]
     return None
-
-
-def _build_agent(env, agent_cfg):
-    m = agent_cfg["models"]
-    hidden_sizes = tuple(m["policy"]["network"][0]["layers"])
-    activation = m["policy"]["network"][0]["activations"]
-
-    models = {
-        "policy": MLPActor(
-            env.observation_space, env.action_space, env.device,
-            hidden_sizes=hidden_sizes, activation=activation,
-            clip_actions=m["policy"].get("clip_actions", False),
-            clip_log_std=m["policy"].get("clip_log_std", True),
-            min_log_std=m["policy"].get("min_log_std", -20.0),
-            max_log_std=m["policy"].get("max_log_std", 2.0),
-        ),
-        "value": MLPCritic(
-            env.observation_space, env.action_space, env.device,
-            hidden_sizes=hidden_sizes, activation=activation,
-            clip_actions=m["value"].get("clip_actions", False),
-        ),
-    }
-
-    memory = RandomMemory(memory_size=1, num_envs=env.num_envs, device=env.device)
-    cfg = PPO_DEFAULT_CONFIG.copy()
-    cfg.update({
-        "state_preprocessor":        RunningStandardScaler,
-        "state_preprocessor_kwargs": {"size": env.observation_space, "device": env.device},
-        "value_preprocessor":        RunningStandardScaler,
-        "value_preprocessor_kwargs": {"size": 1, "device": env.device},
-        "experiment": {"write_interval": 0, "checkpoint_interval": 0},
-    })
-    return PPO(
-        models=models, memory=memory, cfg=cfg,
-        observation_space=env.observation_space,
-        action_space=env.action_space,
-        device=env.device,
-    )
-
-
-def _build_sac_agent(env, agent_cfg):
-    m = agent_cfg["models"]
-    hidden_sizes = tuple(m["policy"]["network"][0]["layers"])
-    activation = m["policy"]["network"][0]["activations"]
-    critic_kwargs = dict(
-        hidden_sizes=hidden_sizes, activation=activation,
-        clip_actions=m["critic"].get("clip_actions", False),
-    )
-    models = {
-        "policy": MLPActor(
-            env.observation_space, env.action_space, env.device,
-            hidden_sizes=hidden_sizes, activation=activation,
-            clip_actions=m["policy"].get("clip_actions", False),
-            clip_log_std=m["policy"].get("clip_log_std", True),
-            min_log_std=m["policy"].get("min_log_std", -20.0),
-            max_log_std=m["policy"].get("max_log_std", 2.0),
-        ),
-        "critic_1":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
-        "critic_2":        MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
-        "target_critic_1": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
-        "target_critic_2": MLPSACCritic(env.observation_space, env.action_space, env.device, **critic_kwargs),
-    }
-    memory = RandomMemory(memory_size=1, num_envs=env.num_envs, device=env.device)
-    cfg = SAC_DEFAULT_CONFIG.copy()
-    cfg.update({
-        "state_preprocessor":        RunningStandardScaler,
-        "state_preprocessor_kwargs": {"size": env.observation_space, "device": env.device},
-        "experiment": {"write_interval": 0, "checkpoint_interval": 0},
-    })
-    return SAC(
-        models=models, memory=memory, cfg=cfg,
-        observation_space=env.observation_space,
-        action_space=env.action_space,
-        device=env.device,
-    )
 
 
 def _quat_to_euler_deg(q):
@@ -160,9 +87,6 @@ def _quat_to_euler_deg(q):
 
 
 def main() -> None:
-    if args_cli.log and args_cli.num_envs > 1:
-        raise ValueError("Logging requires --num_envs 1.")
-
     env_cfg = parse_env_cfg(
         args_cli.task,
         device=args_cli.device,
@@ -191,8 +115,6 @@ def main() -> None:
     except AttributeError:
         dt = env.unwrapped.step_dt
 
-    logger = CSVLogger(log_dir) if args_cli.log else None
-
     if args_cli.video:
         video_kwargs = {
             "video_folder": os.path.join(log_dir, "videos", "play"),
@@ -200,21 +122,21 @@ def main() -> None:
             "video_length": args_cli.video_length,
             "disable_logger": True,
         }
-        print("[INFO] Recording video")
-        print_dict(video_kwargs, nesting=4)
+        log.info("Recording video")
+        print_dict(video_kwargs, nesting=4)  # isaaclab helper, not a bare print
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     env = SkrlVecEnvWrapper(env, ml_framework="torch")
     if algorithm == "sac":
-        agent = _build_sac_agent(env, experiment_cfg)
+        agent = build_sac_agent(env, experiment_cfg, training=False)
     else:
-        agent = _build_agent(env, experiment_cfg)
+        agent = build_ppo_agent(env, experiment_cfg, training=False)
 
     if resume_path:
-        print(f"[INFO] Loading checkpoint: {resume_path}")
+        log.info("Loading checkpoint: %s", resume_path)
         agent.load(resume_path)
     else:
-        print("[INFO] No checkpoint found - running with untrained policy.")
+        log.warning("No checkpoint found - running with untrained policy.")
 
     agent.set_running_mode("eval")
 
@@ -225,18 +147,20 @@ def main() -> None:
     ep_steps = 0
     prev_episode_ended = False
 
-    print(f"[INFO] Observation shape: {obs.shape}")
-    print(f"[INFO] Episode length: {env_cfg.episode_length_s}s")
+    log.info("Observation shape: %s", obs.shape)
+    log.info("Episode length: %ss", env_cfg.episode_length_s)
 
     wp_total = env_cfg.commands.target.waypoints_per_episode
+    cam = CameraFollower()
 
     while simulation_app.is_running():
         start_time = time.time()
 
-        # Save pre-step state — env auto-resets on terminal, wiping this info.
+        # Save pre-step state - env auto-resets on terminal, wiping this info.
         if args_cli.num_envs == 1:
             _pre_obs     = obs[0].cpu().clone()
             _pre_pos     = raw_env.scene["robot"].data.root_pos_w[0].cpu().clone()
+            cam.update(_pre_pos.numpy())
 
         with torch.inference_mode():
             outputs = agent.act(obs, timestep=0, timesteps=0)
@@ -265,16 +189,17 @@ def main() -> None:
                 spd       = torch.norm(lin_vel).item()
                 angv      = torch.norm(ang_vel).item()
                 alt       = _pre_pos[2].item()
-                phase2    = _pre_obs.shape[0] >= 62
+                phase2    = _pre_obs.shape[0] >= PHASE2_MIN_OBS_DIM
 
                 if torch.isnan(_pre_obs).any().item():
-                    print(f"[NaN  ep={num_episode}  s={ep_steps}]  *** NaN in observations ***")
+                    log.error("NaN in observations  ep=%d  s=%d", num_episode, ep_steps)
 
                 if ep_steps <= 3 or ep_steps % 100 == 0:
-                    print(
-                        f"[ep={num_episode}  s={ep_steps:4d}]  "
-                        f"alt={alt:4.1f}  dist={dist:5.1f}  wp={wp_rem}/{wp_total}  "
-                        f"yaw={yaw:+6.1f}  spd={spd:4.1f}  angv={angv:4.1f}  rew={r:+7.2f}"
+                    log.debug(
+                        "ep=%d  s=%4d  alt=%4.1f  dist=%5.1f  wp=%d/%d  "
+                        "yaw=%+6.1f  spd=%4.1f  angv=%4.1f  rew=%+7.2f",
+                        num_episode, ep_steps, alt, dist, wp_rem, wp_total,
+                        yaw, spd, angv, r,
                     )
 
                     if phase2:
@@ -299,31 +224,26 @@ def main() -> None:
                         elif tech == 3:
                             param_str = f"  por={por:.0f}  vpor={vpor:.0f}"
                         pwr_str = f"{pwr*100:.0f}%" if pwr > 0.0 else "DEPLETED"
-                        print(
-                            f"         radar  {'  |  '.join(radar_parts)}\n"
-                            f"         drfm   {_TECH[tech]}{param_str}  pwr={pwr_str}"
+                        log.debug(
+                            "         radar  %s\n         drfm   %s%s  pwr=%s",
+                            "  |  ".join(radar_parts), _TECH[tech], param_str, pwr_str,
                         )
 
             if t or tr:
-                # Use pre-step state — post-step is already the next episode.
+                # Use pre-step state - post-step is already the next episode.
                 wp_done = wp_total - int(round(_pre_obs[3].item() * wp_total))
                 outcome = "SUCCESS" if t and wp_done >= wp_total else ("KILLED" if t else "TIMEOUT")
-                print(
-                    f"[ep={num_episode:3d}  {outcome}]  "
-                    f"steps={ep_steps:4d}  return={ep_return:+8.2f}  "
-                    f"wp={wp_done}/{wp_total}  "
-                    f"pos=({_pre_pos[0]:.1f},{_pre_pos[1]:.1f},{_pre_pos[2]:.1f})"
+                log.info(
+                    "ep=%3d  %s  steps=%4d  return=%+8.2f  wp=%d/%d  pos=(%.1f,%.1f,%.1f)",
+                    num_episode, outcome, ep_steps, ep_return,
+                    wp_done, wp_total,
+                    _pre_pos[0], _pre_pos[1], _pre_pos[2],
                 )
 
         if terminated.any() or truncated.any():
             num_episode += 1
             ep_return = 0.0
             ep_steps = 0
-
-            if logger:
-                logger.save()
-                if num_episode >= args_cli.log:
-                    break
 
         if args_cli.video:
             timestep += 1
@@ -334,9 +254,6 @@ def main() -> None:
             sleep_time = dt - (time.time() - start_time)
             if sleep_time > 0:
                 time.sleep(sleep_time)
-
-        if logger and not (terminated.any() or truncated.any()):
-            logger.log(info["metrics"])
 
     env.close()
 

@@ -39,6 +39,40 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
     </tr>
 </table>
 
+## Project Organization
+
+```
+├── LICENSE
+├── README.md
+│
+├── docs/               # Thought process, task list, updates, research
+├── media/ 
+├── examples/           # Old tutorial for bookkeeping
+├── scripts/            # Main run files
+│   ├── train.py
+│   ├── play.py
+│   └── manage_replay_buffer.py  # Replay buffer rotation and inspection
+│
+├── drfm/
+│   ├── __init__.py
+│   ├── assets/         # Iris USD
+│   ├── robots/         # Drone file
+│   ├── envs/
+│   │   ├── isaac/      # Drone recon cfg
+│   │   │   └── mdp/    # Actions, Observations, etc
+│   │   └── gym/
+│   ├── agents/         # Skrl hyperparameters
+│   ├── algorithms/     # Classic RL algos
+│   ├── dynamics/       # Drone dynamics (Isaac drone racer)
+│   └── utils/
+│
+├── models/
+│   ├── architectures/  # Actor, Critic, SAC Critic network definitions
+│   ├── checkpoints/    # Saved model weights
+│   ├── configs/        # Saved run hyperparameter dumps
+└   └── replay_buffers/
+```
+
 ## Phases
 
 <table align="center">
@@ -98,40 +132,6 @@ export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.
 ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 
-## Project Organization
-
-```
-├── LICENSE
-├── README.md
-│
-├── docs/               # Thought process, task list, updates, research
-├── media/ 
-├── examples/           # Old tutorial for bookkeeping
-├── scripts/            # Main run files
-│   ├── train.py
-│   ├── play.py
-│   └── manage_replay_buffer.py  # Replay buffer rotation and inspection
-│
-├── drfm/
-│   ├── __init__.py
-│   ├── assets/         # Iris USD
-│   ├── robots/         # Drone file
-│   ├── envs/
-│   │   ├── isaac/      # Drone recon cfg
-│   │   │   └── mdp/    # Actions, Observations, etc
-│   │   └── gym/
-│   ├── agents/         # Skrl hyperparameters
-│   ├── algorithms/     # Classic RL algos
-│   ├── dynamics/       # Drone dynamics (Isaac drone racer)
-│   └── utils/
-│
-├── models/
-│   ├── architectures/  # Actor, Critic, SAC Critic network definitions
-│   ├── checkpoints/    # Saved model weights
-│   ├── configs/        # Saved run hyperparameter dumps
-└   └── replay_buffers/
-```
-
 ## TODOS
 
 1. Rewards that take into account radar and DRFM module
@@ -143,20 +143,22 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 
 ## References
 
+1. Schulman, John, et al. "Proximal policy optimization algorithms." arXiv preprint arXiv:1707.06347 (2017).
+1. Haarnoja, Tuomas, et al. "Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor." International conference on machine learning. Pmlr, 2018.
 1. Wang, Chao, et al. *"Autonomous navigation of UAV in large-scale unknown complex environment with deep reinforcement learning."* GlobalSIP 2017
 1. Kaufmann, E., et al. *"Champion-level drone racing using deep reinforcement learning."* Nature, 2023
-2. Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
-3. Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
-4. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.
-5. [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
-6. [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
-7. [Isaac Lab: RL Environments](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
-8. [Radar Equations - MIT Lincoln Lab](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
-9. [Radar Jamming and Deception - Wikipedia](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
-10. [DRFM: History, Circuit & Testing - Rohde & Schwarz](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
-11. [TD Learning - Stanford CME241](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
-12. [Bellman Equation - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#The_Bellman_equation)
-13. [Bellman's Principle of Optimality - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#Bellman's_principle_of_optimality)
-14. [MDP Algorithms: Value & Policy Iteration - Wikipedia](https://en.wikipedia.org/wiki/Markov_decision_process#Algorithms)
-16. [AN/ALE-55 Fiber-Optic Towed Decoy (FOTD) Image - BAE SYSTEMS](https://www.baesystems.com/en-us/product/anale55-fiberoptic-towed-decoy)
-15. Claude (Anthropic)
+1. Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
+1. Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
+1. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.
+1. [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
+1. [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
+1. [Isaac Lab: RL Environments](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
+1. [Radar Equations - MIT Lincoln Lab](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
+1. [Radar Jamming and Deception - Wikipedia](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
+1. [DRFM: History, Circuit & Testing - Rohde & Schwarz](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
+1. [TD Learning - Stanford CME241](https://web.stanford.edu/class/cme241/lecture_slides/rich_sutton_slides/11-12-TD.pdf)
+1. [Bellman Equation - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#The_Bellman_equation)
+1. [Bellman's Principle of Optimality - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#Bellman's_principle_of_optimality)
+1. [MDP Algorithms: Value & Policy Iteration - Wikipedia](https://en.wikipedia.org/wiki/Markov_decision_process#Algorithms)
+1. [AN/ALE-55 Fiber-Optic Towed Decoy (FOTD) Image - BAE SYSTEMS](https://www.baesystems.com/en-us/product/anale55-fiberoptic-towed-decoy)
+1. Claude (Anthropic)

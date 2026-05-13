@@ -1,4 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mohammad Ali
 #
+# Copyright (c) 2025, Kousheek Chakraborty
+# Original work licensed under the BSD-3-Clause License.
+# Built on the IsaacLab framework (https://github.com/isaac-sim/IsaacLab).
 
 import torch
 

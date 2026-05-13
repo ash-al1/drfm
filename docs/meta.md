@@ -1,13 +1,25 @@
----                                                                                 
+# Tasks:
 
-# Tasks:                                                                            
-+ Create visualization functions for this (saliency or something else)
-+ Ablation with NNs
-+ Try SAC, TRPO - something with replay buffer
++ Add SKRL multi agent
++ Use offline stored IQ waveforms
++ Reward shaping for managing radar state
+    - this needs research
++ POMDP - RWR and radar have info when they should not
+    - fix rwr\_observations
+    - agent infers radar state from signal behavior instead
+    - give timestep history of RWR, remove tq and radar state
+    - replace MLP with GRU or LSTM
++ Fix --debug
++ Need outputs!!! Plots, visualizations!!! Saliency? or similar?
++ Replay, memory need to be properly managed
++ Submission stuff to keep in check:
+    - Change readme
+    - Choose better images, and include results
 
 ---
 
 # Ideas
+
 + Create difficult environments that can train UAV navigation and DRFM module
   separately, or together that are unrealistic yet help train an agent.
 + Use Isaac sim to export drone pos/vel. emitter location, LoS or not. Feed
@@ -28,6 +40,7 @@
 ---
 
 # Qs:
+
 + In what situations does the DRFM module do: X - i.e. when to time/freq etc?
 + Should I focus on theoretical guarantees? This devolves the project down into
   reading theoretical books on digital signal processing, wireless
@@ -40,6 +53,7 @@
 ---
 
 # Goal:
+
 + Closed loop environment, continuous state space, actions
 + More complicated: multi-target tracking
 [ ] RF environment model
@@ -56,22 +70,28 @@
     + Select shifts,delays, etc of DRFM module to keep it alive
     + What other tasks can it get? Maybe RL agent that flies the drone?
 
-
 ---
 
-# Poor:
-+ Can not just use isaac drone racer out of the box, algorithm and MDP dynamics
-  are incomplete for our task
-+ [DRFM - Mesarcik](https://github.com/mesarcik/DRFM) is not useful DRFM action
-  space, not built on real world techniques. It does amplitude, frequency,
-  phase, etc changes - which is fundamentally accurate yet mathematically
-  nebulous. It simplifies a DRFM module too much.
-+ Using an FPGA is problematic because of time constraints, can't wait for data
-  in/out for each iteration on many agents in an environment.
+# Versions
 
----
+## V3
 
-# Done:
++ Remove CSVLogger() which does plots(?) idk
++ Add --log-level in train, remove debug interval
++ Remove redundant debugs/printing in train and switch to tensorboard
++ Add physx
++ Refactor train::main() to be small
++ Change printing to logging
++ Proper licensing with notice
++ Add one-liner docstrings
++ Cleanup train script, move odd functions to drfm/agents
++ Cleanup fmtTime function
++ Removed drone racer and phase 0 stuff only kept singleDRFM environment
++ Add paper references for SAC,PPO - add more later for MARL
++ Move sac and PPO building to agents/builder.py
++ Remove useless __init__ files
+
+## V2
 + DRFM
     + Still work in progress, power consumption, delays need tuning
     + Each radar is weak against some DRFM and not others
@@ -85,7 +105,10 @@
 + Defined DRFM action space as [Off, RGPO, VGPO, RVGPO]
     - Discrete action space, continuous parameter selection per technique
     - PPO with discrete head, continuous head per technique for parameters
-+ Pull Isaac drone racer project 
++ Pull Isaac drone racer project
+
+## V1
+
 + Tabular RL Q-learning model implementation to test a simple agent can learn to
   survive. Agents actions could be to select DRFM module parameters. Drone
   maneuvarability should be continuous algorithm. (`drfm_grid_env.py`)
@@ -100,3 +123,17 @@
 + Map continuous to map discrete values
 + Port libmdp and libsparse over from mini projects
 
+---
+
+# Poor:
+
+Poor ideas we had that got dropped later at some point.
+
++ Can not just use isaac drone racer out of the box, algorithm and MDP dynamics
+  are incomplete for our task
++ [DRFM - Mesarcik](https://github.com/mesarcik/DRFM) is not useful DRFM action
+  space, not built on real world techniques. It does amplitude, frequency,
+  phase, etc changes - which is fundamentally accurate yet mathematically
+  nebulous. It simplifies a DRFM module too much.
++ Using an FPGA is problematic because of time constraints, can't wait for data
+  in/out for each iteration on many agents in an environment.

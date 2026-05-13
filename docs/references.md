@@ -1,12 +1,28 @@
 # References
 
-This file contains my summarization on research papers I read. This is not a
-comprehensive references file as some of my notes are on hard paper, or littered
-throughout many file ... or in my head.
+> This file contains notes on research papers I read for this project. Some are
+not included if they exist in other projects and I forgot to include them here ;
+although most should be present.
+
 
 ---
 
-Wang, Chao, et al. "Autonomous navigation of UAV in large-scale unknown complex
+> Haarnoja, Tuomas, et al. "Soft actor-critic: Off-policy maximum entropy deep
+reinforcement learning with a stochastic actor." International conference on
+machine learning. Pmlr, 2018.
+
+
+
+---
+
+> Schulman, John, et al. "Proximal policy optimization algorithms." arXiv preprint
+arXiv:1707.06347 (2017).
+
+
+
+---
+
+> Wang, Chao, et al. "Autonomous navigation of UAV in large-scale unknown complex
 environment with deep reinforcement learning." 2017 IEEE Global Conference on
 Signal and Information Processing (GlobalSIP). Ieee, 2017.
 
@@ -26,8 +42,6 @@ POMDP using two RNNs, critic then actor updates using backpropagation through
 time.
 
 
----
-
 - Poisson: Modeling rare or independent random events over fixed time/space
 - Bernoulli: Modeling coin flips, does this pixel contain real target or no
 - Markovian: Whats the future state given only current state (memoryless)
@@ -36,7 +50,7 @@ time.
 
 ---
 
-Pinto, Juliano, et al. "Next generation multitarget trackers: Random finite set
+> Pinto, Juliano, et al. "Next generation multitarget trackers: Random finite set
 methods vs transformer-based deep learning." 2021 IEEE 24th International
 Conference on Information Fusion (FUSION). IEEE, 2021.
 
@@ -63,33 +77,23 @@ loss L, maximize invariance.
 
 ---
 
-Zhang, Chudi, et al. "Radar jamming decision-making in cognitive electronic
+> Zhang, Chudi, et al. "Radar jamming decision-making in cognitive electronic
 warfare: A review." IEEE Sensors Journal 23.11 (2023): 11383-11403.
 
 
 ---
 
-Hiles, Alex, et al. "Jammer Versus Radar in a Cognitive Electronic Warfare
-Environment." Authorea Preprints (2025).
+> Mesarcik, Michael B., Daniel W. O'Hagan, and Stephen Paine. "Low Cost FPGA based
+Implementation of a DRFM System." 2019 IEEE Radar Conference (RadarConf). IEEE, 2019.
 
 ---
 
-Mesarcik, Michael B., Daniel W. O'Hagan, and Stephen Paine. "Low Cost FPGA based
-Implementation of a DRFM System." 2019 IEEE Radar Conference (RadarConf). IEEE,
-2019.
-
----
-
-[SPJ](https://www.radartutorial.eu/16.eccm/ja11.en.html)
-
----
-
-You, Shixun, Ming Diao, and Lipeng Gao. "Deep reinforcement learning for target
+>You, Shixun, Ming Diao, and Lipeng Gao. "Deep reinforcement learning for target
 searching in cognitive electronic warfare." IEEE Access 7 (2019): 37432-37447.
 
 ---
 
-Sequential Monte Carlo Cardinalized probability hypothesized density filter
+>Sequential Monte Carlo Cardinalized probability hypothesized density filter
 based on Track-Before-Detect for fluctuating targets in heavy-tailed clutter
 
 Baysian filtering in heavy-tailed clutter environment. Heavy mathematics,
@@ -102,8 +106,6 @@ signal data before threshold, building confidence over multiple frames before
 declaring a target exists. Papers often do this kind of thing, where confidence
 is the measure they use to build belief whether a target exists or not, because
 RDR is extremely noise heavy.
-
----
 
 A robust multiple target tracking framework with Transformer-based data
 association and dynamic trajectory management in challenging environments

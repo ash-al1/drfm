@@ -1,9 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mohammad Ali
 #
-#
-
-#
-
-"""Configuration for the quadcopters"""
+# Copyright (c) 2025, Kousheek Chakraborty
+# Original work licensed under the BSD-3-Clause License.
+# Built on the IsaacLab framework (https://github.com/isaac-sim/IsaacLab).
 
 from __future__ import annotations
 
@@ -11,14 +11,11 @@ import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import ArticulationCfg
 
-##
-# Configuration
-##
-
 FIVE_IN_DRONE = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/ic3/gits/isaac_drone_racer/assets/5_in_drone/5_in_drone.usd",
+        # Remove hardcoded path!
+        usd_path="/home/ic3/ic3/drfm/drfm/assets/5_in_drone.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -54,4 +51,3 @@ FIVE_IN_DRONE = ArticulationCfg(
         ),
     },
 )
-"""Configuration for the Crazyflie quadcopter."""
