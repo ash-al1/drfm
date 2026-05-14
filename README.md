@@ -14,7 +14,7 @@
 This project aims to create a realistic Digital Radio Frequency Memory module
 embedded on a drone that operates using Reinforcement Learning algorithms, the
 drone itself also maneuvers using an algorithm tasked with surviving Radar
-tracking. Maneuverability is based on [4] which is based off the research paper
+tracking. Maneuverability is based on [9] which is based off the research paper
 [4]. Drone is used to survive some electromagnetic environment with
 deterministic radars that attempt to gain a lock, the DRFM module is trained to
 survive using realistic jamming techniques: transponder and repeater false
@@ -210,6 +210,18 @@ the book or online (SPJ). I did not create any of the assets used (drone mesh,
 USD, URDF and so on), most media was created by me besides the AI generated
 image of BAE systems decoy as header in this file.
 
+## Future 
+
+```
+1. Properly get MAPPO & PPO GRU working.
+    - I need an easier way to validate whats going on, visualize inconsistencies
+      and debug easier.
+2. Change reward structure so its not unbearably fragile.
+3. Change environment to be more realistic.
+4. Add IQ waveforms using USRP recorded signals instead of janky radar
+   interactions we current have.
+```
+
 
 ## References
 
@@ -220,6 +232,7 @@ image of BAE systems decoy as header in this file.
 1. Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
 1. Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
 1. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.
+1. Salimpour, Sahar, et al. "Sim-to-real transfer for mobile robots with reinforcement learning: from nvidia isaac sim to gazebo and real ros 2 robots." arXiv preprint arXiv:2501.02902 (2025).
 1. [PPO SKRL](https://skrl.readthedocs.io/en/latest/api/agents/ppo.html)
 1. [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
 1. [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
