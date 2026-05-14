@@ -1,4 +1,4 @@
-# Reinforcement Learning & DRFM
+# Multi-Agent Reinforcement Learning & DRFM
 
 <table align="center">
     <tr>
@@ -6,7 +6,7 @@
             <img src="media/bae.png" height="200px" />
         </td>
         <td>
-            <img src="media/draw.png" height="200px" />
+            <img src="media/mappo.gif" height="200px" />
         </td>
     </tr>
 </table>
