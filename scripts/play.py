@@ -159,7 +159,7 @@ def main() -> None:
     log.info("Episode length: %ss", env_cfg.episode_length_s)
 
     wp_total = getattr(getattr(getattr(env_cfg, "commands", None), "target", None), "waypoints_per_episode", 3)
-    cam = CameraFollower()
+    cam = CameraFollower() if algorithm != "mappo" else None
 
     while simulation_app.is_running():
         start_time = time.time()
@@ -169,7 +169,8 @@ def main() -> None:
             _obs0        = obs[list(obs.keys())[0]] if isinstance(obs, dict) else obs
             _pre_obs     = _obs0[0].cpu().clone()
             _pre_pos     = raw_env.scene["robot"].data.root_pos_w[0].cpu().clone()
-            cam.update(_pre_pos.numpy())
+            if cam is not None:
+                cam.update(_pre_pos.numpy())
 
         with torch.inference_mode():
             states = env.state() if hasattr(env, "state") else None

@@ -17,6 +17,18 @@ to fit our project ~ non-trivially.
       environment is, this worked fine w.r.t static environment.
     - MAPPO has no scaffolding it trains both navigation and DRFM modules at the
       same time (PPO+GRU contains scaffolding and still fails).
+    - Credit assignment when shared as we do it allows cooperative gaming, each
+      drone hugs another to make sure it doesn't get locked on completely (not
+      realistic, swapping skins shouldn't completely drop another). But its cool
+      to see drones helping one another escape tough illuminations.
+    - Somewhat balanced DRFM technique usage surprisingly, considering RVGPO is
+      godmode and works on all 3 radars present. Although has higher power
+      usage. When moving sim-to-real we would use realisitic values here. RGPO
+      has highest use because 2/3 radars lose against it and it has same power
+      usage as VGPO.
+    - Peak reward at 68 and then continued training somehow worsens the model im
+      not sure why this is happening but i'd play around with hyperparameters if
+      I had the time.
 1. PPO_GRU fails to hover and navigate completely, high collision rate ; agent
    just gradually falls to the ground
     - Action mapping (motor, allocation) is not good. Added piecewise-linear

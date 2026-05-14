@@ -1,19 +1,5 @@
 # Tasks:
 
-+ Add SKRL multi agent
-+ WP 3/3 bug
-+ POMDP - RWR and radar have info when they should not
-    - fix rwr\_observations
-    - agent infers radar state from signal behavior instead
-    - give timestep history of RWR, remove tq and radar state
-    - replace MLP with GRU or LSTM
-+ Fix --debug
-+ Need outputs!!! Plots, visualizations!!! Saliency? or similar?
-+ Replay, memory need to be properly managed
-+ Submission stuff to keep in check:
-    - Change readme
-    - Choose better images, and include results
-
 ---
 
 # Ideas

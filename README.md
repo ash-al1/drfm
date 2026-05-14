@@ -74,13 +74,19 @@ python3 scripts/train.py --task singleDRFM --headless --num_envs 4096 --algorith
 python3 scripts/play.py --task singleDRFM --num_envs 1 --algorithm PPO_GRU --debug
 ```
 
-Scaffolding
+Scaffolding (PPO+GRU)
 ```sh
 python3 scripts/train.py --task singleDRFM_stage1 --headless --num_envs 8192 --algorithm PPO_GRU --log-level INFO
 python3 scripts/train.py --task singleDRFM_stage2 --headless --num_envs 8192 --algorithm PPO_GRU --log-level INFO --checkpoint path/to/stage1/best_agent.pt
 
 python3 scripts/play.py --task singleDRFM_stage1 --num_envs 1 --algorithm PPO_GRU --debug
 python3 scripts/play.py --task singleDRFM_stage2 --num_envs 1 --algorithm PPO_GRU --debug
+```
+
+MAPPO (MARL)
+```sh
+python3 scripts/train.py --task multiDRFM --headless --num_envs 2048 --algorithm MAPPO --log-level INFO
+python3 scripts/play.py --task multiDRFM --num_envs 1 --algorithm MAPPO --debug
 ```
 
 ## Environment
@@ -129,6 +135,29 @@ python3 scripts/play.py --task singleDRFM_stage2 --num_envs 1 --algorithm PPO_GR
 | `step_penalty` | -0.01 | Time alive penalty |
 
 ## Algorithms
+
+<table align="center">
+    <tr>
+        <td align="center">
+            <img src="media/plot_return.png" height="200px" /><br>
+            Episode Return
+        </td>
+        <td align="center">
+            <img src="media/plot_ep_length.png" height="200px" /><br>
+            Episode Length
+        </td>
+    </tr>
+    <tr>
+        <td align="center">
+            <img src="media/plot_technique.png" height="200px" /><br>
+            DRFM Technique Usage
+        </td>
+        <td align="center">
+            <img src="media/plot_policy_loss.png" height="200px" /><br>
+            Policy Loss
+        </td>
+    </tr>
+</table>
 
 We used Proximal Policy Optimization (PPO) as the backbone throughout the
 project with Soft Actor-Critic (SAC) added later for ablation & replay buffer
