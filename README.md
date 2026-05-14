@@ -20,7 +20,9 @@ deterministic radars that attempt to gain a lock, the DRFM module is trained to
 survive using realistic jamming techniques: transponder and repeater false
 targeting, combination of RGPO and VGPO, and SAR active decoy.
 
-## DRFM Action Space
+## Foundations
+
+We highly recommend readers to go through `docs/` directory for quickly catching up to speed with how foundational things are implemented in this project or building a mental mindmap on where inspiration came from.
 
 <table align="center">
     <tr>
@@ -39,41 +41,7 @@ targeting, combination of RGPO and VGPO, and SAR active decoy.
     </tr>
 </table>
 
-## Project Organization
-
-```
-├── LICENSE
-├── README.md
-│
-├── docs/               # Thought process, task list, updates, research
-├── media/ 
-├── examples/           # Old tutorial for bookkeeping
-├── scripts/            # Main run files
-│   ├── train.py
-│   ├── play.py
-│   └── manage_replay_buffer.py  # Replay buffer rotation and inspection
-│
-├── drfm/
-│   ├── __init__.py
-│   ├── assets/         # Iris USD
-│   ├── robots/         # Drone file
-│   ├── envs/
-│   │   ├── isaac/      # Drone recon cfg
-│   │   │   └── mdp/    # Actions, Observations, etc
-│   │   └── gym/
-│   ├── agents/         # Skrl hyperparameters
-│   ├── algorithms/     # Classic RL algos
-│   ├── dynamics/       # Drone dynamics (Isaac drone racer)
-│   └── utils/
-│
-├── models/
-│   ├── architectures/  # Actor, Critic, SAC Critic network definitions
-│   ├── checkpoints/    # Saved model weights
-│   ├── configs/        # Saved run hyperparameter dumps
-└   └── replay_buffers/
-```
-
-## Phases
+## Usage
 
 <table align="center">
     <tr>
@@ -87,39 +55,45 @@ Environment is split into two phases: (1) navigation, (2) DRFM. This allows us
 to test different agents, architectures on invidiual problems. Later the agent
 will be packaged without any regards for which phase to use.
 
-Navigation only: simple case of drone that navigates to three separate waypoints
-that are randomly placed within boundary walls.
+Full task (navigation + DRFM):
 ```sh
-HYDRA_FULL_ERROR=1 python3 scripts/train.py --task Isaac-Drone-Recon-v0 --headless --num_envs 4096 --phase 1 --algorithm SAC --save_buffer_interval 10000 --buffer_keep_n 3
-
-python3 scripts/play.py --task Isaac-Drone-Recon-Play-v0 --num_envs 1 --algorithm SAC --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
+python3 scripts/train.py --task singleDRFM --headless --num_envs 4096 --algorithm PPO_GRU --log-level INFO
+python3 scripts/play.py --task singleDRFM --num_envs 1 --algorithm PPO_GRU --debug
 ```
 
-Navigation and DRFM: three separate radars are present one for each action space
-above sparsely located to not interfere with each other. DRFM has no direct
-connection to rewards, this needs to be thought through better.
+Scaffolding
 ```sh
-python3 scripts/train.py --task Isaac-Drone-Recon-v1 --headless --num_envs 2048 --phase 2 --algorithm PPO
+python3 scripts/train.py --task singleDRFM_stage1 --headless --num_envs 8192 --algorithm PPO_GRU --log-level INFO
+python3 scripts/train.py --task singleDRFM_stage2 --headless --num_envs 8192 --algorithm PPO_GRU --log-level INFO --checkpoint path/to/stage1/best_agent.pt
 
-python3 scripts/play.py --task Isaac-Drone-Recon-Play-v1 --num_envs 1 --algorithm PPO --debug --checkpoint models/checkpoints/[CHECKPOINT]/agent_best.pt
+python3 scripts/play.py --task singleDRFM_stage1 --num_envs 1 --algorithm PPO_GRU --debug
+python3 scripts/play.py --task singleDRFM_stage2 --num_envs 1 --algorithm PPO_GRU --debug
 ```
 
 ## Justification
 
-We used Proximal Policy Optimazation (PPO) throughout the project and only added
-Soft Actor-Critic (SAC) later for ablation & replay buffer. Both these agents
-support hybrid discrete-continuous actions which is critical for the DRFM
-module, which supports 3 discrete actions: RGPO, VGPO, RVGPO - when one of these
-is selected each has continuous set based on its position w.r.t radar. PPO and
-SAC covers decent variance since one is on-policy and the other is off-policy.
+We used Proximal Policy Optimization (PPO) as the backbone throughout the
+project with Soft Actor-Critic (SAC) added later for ablation & replay buffer
+comparison. Both agents support hybrid discrete-continuous actions which is
+critical for the DRFM module — technique selection is discrete (OFF, RGPO,
+VGPO, RVGPO) while each technique's parameters (pull-off rate, velocity
+pull-off rate, coordination ratio) are continuous. PPO and SAC cover decent
+variance since one is on-policy and the other is off-policy.
+
+We also implemented PPO_GRU (PPO with a GRU recurrent encoder) specifically
+to handle partial observability in the radar environment. The drone receives
+Radar Warning Receiver (RWR) observations including: bearing, power,
+illumination rate, pulse interval variance which are noisy single-timestamp
+snapshots. A memoryless MLP policy cannot distinguish whether a radar is ramping up
+toward lock or cooling down from a failed track. The GRU encodes the temporal
+RWR stream (32D) into a hidden state while passing static observations
+(attitude, velocity, DRFM state) through directly. Theoretically, this
+split-stream design lets the agent build a mental model of radar over
+time without forcing navigation state through recurrence.
 
 All other agents mentioned, DQN, REINFORCE, vanilla Actor-Critic, DDPG, TD3 and
 TRPO cannot be used for any of these reasons: discrete only, continuous only,
 higher variance. Also PPO is pretty popular compared to all the others ...
-
-For thought process in building the environment, how we structure separate
-navigation and DRFM, and jointly incorporate them take a look in
-./docs/thoughts.md. This file also includes some major issues we ran into.
 
 ## Setup
 
@@ -132,14 +106,45 @@ export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.
 ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 
-## TODOS
+Modify robot path in `drfm/robots/five_in_drone.py`
 
-1. Rewards that take into account radar and DRFM module
-2. More agents for wider study
-3. Incorporate GNU Radio for direct RF signals
-4. Pull FPGA statistics, compute for DRFM usage
-5. Change drone to fixed wing or non-racing drone
-6. Change environment to be more realistic
+## Project Organization
+
+```
+  ├── LICENSE / NOTICE
+  ├── README.md
+  ├── environment.yaml
+  ├── docs/               # Research notes & technical challenges
+  │   ├── drfm.md
+  │   ├── radar.md
+  │   ├── meta.md
+  │   ├── references.md
+  │   └── technical-challenges.md
+  │
+  ├── media/
+  ├── scripts/
+  │   ├── train.py
+  │   └── play.py
+  │
+  ├── outputs/
+  ├── drfm/
+  │   ├── assets/
+  │   │   └── configuration/
+  │   ├── robots/
+  │   ├── dynamics/
+  │   ├── algorithms/
+  │   ├── agents/
+  │   ├── utils/
+  │   └── isaac/
+  │       ├── drfm_env.py
+  │       ├── agents/
+  │       └── mdp/
+  │
+  └── models/
+      ├── architectures/
+      ├── checkpoints/
+      └── replay_buffers/
+```
 
 ## References
 
@@ -153,6 +158,7 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 1. [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
 1. [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
 1. [Isaac Lab: RL Environments](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
+1. [Isaac Lab: Actuators](https://docs.nvidia.com/learning/physical-ai/getting-started-with-isaac-lab/latest/transferring-robot-learning-policies-from-simulation-to-reality/04-bridging-the-gap-real-world-data-integration/01-actuator-modeling.html)
 1. [Radar Equations - MIT Lincoln Lab](https://www.ll.mit.edu/sites/default/files/outreach/doc/2018-07/lecture%202.pdf)
 1. [Radar Jamming and Deception - Wikipedia](https://en.wikipedia.org/wiki/Radar_jamming_and_deception)
 1. [DRFM: History, Circuit & Testing - Rohde & Schwarz](https://www.rohde-schwarz.taipei/data/activity/file/1644474835378405224.pdf)
@@ -161,4 +167,5 @@ ln -s ${ISAACSIM_PATH} _isaac_sim
 1. [Bellman's Principle of Optimality - Wikipedia](https://en.wikipedia.org/wiki/Bellman_equation#Bellman's_principle_of_optimality)
 1. [MDP Algorithms: Value & Policy Iteration - Wikipedia](https://en.wikipedia.org/wiki/Markov_decision_process#Algorithms)
 1. [AN/ALE-55 Fiber-Optic Towed Decoy (FOTD) Image - BAE SYSTEMS](https://www.baesystems.com/en-us/product/anale55-fiberoptic-towed-decoy)
+1. [Radar Tutorials: Self Protection Jammer](https://www.radartutorial.eu/16.eccm/ja11.en.html)
 1. Claude (Anthropic)

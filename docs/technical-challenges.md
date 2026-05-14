@@ -6,6 +6,10 @@ to fit our project ~ non-trivially.
 
 ## V3 Problems and solutions
 
+1. PPO_GRU fails to hover and navigate completely, high collision rate ; agent
+   just gradually falls to the ground
+    - Action mapping (motor, allocation) is not good. Added piecewise-linear
+      over bias with action=0 hover thrust.
 1. Struggling to fix the agent just flying upward/downward and insta-terminating
     - Added new observations for altitude & vertical velocity
     - Also the initial bias the drone has is to climb up caused by the control
