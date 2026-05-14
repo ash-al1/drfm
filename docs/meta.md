@@ -78,6 +78,15 @@ checks. 25K timesteps for final (45~ minutes).
 
 ### V3
 
++ Multi-Agent RL
+    - Natural progression for drone work is swarms or multi-agent RL
+    - Implement MAPPO taking care to use centralized critic
+    - Chose to use averaged rewards for all drones which completely eliminates
+      the ability to figure out which drone is collapsing but this surprisingly
+      worked better than I expected. The more drone we use though, the worse it
+      gets.
+    - Had some issues figuring out the dimensions for this properly, we just
+      flatenned the entire 280-dim on a 5-drone run and it seemed to work fine.
 + Calculate distance from drone to objects properly (to surface, not center)
 + Better outputs, accumulated terminations, and other metrics printed on train
 + Terminate when too close to ground
