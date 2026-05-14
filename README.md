@@ -45,16 +45,25 @@ We highly recommend readers to go through `docs/` directory for quickly catching
 
 ## Setup
 
-Make sure Isaac Sim and Lab are [installed](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html#verifying-the-isaac-lab-installation) & environment is setup properly:
-```
+**Requirements:** NVIDIA GPU (tested on RTX 4090), CUDA 12.x, Python 3.11.
+
+1. Install Isaac Sim (binary) and IsaacLab following the [official guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html).
+
+2. Create the conda environment and set Isaac Sim paths:
+```sh
 conda env create -f environment.yaml -n [name]
 conda activate [name]
 export ISAACSIM_PATH="${HOME}/isaacsim/_build/linux-x86_64/release"
-export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.sh"
+export ISAACSIM_PYTHON_EXE="${ISAACSIM_PATH}/python.sh"
 ln -s ${ISAACSIM_PATH} _isaac_sim
 ```
 
-Modify robot path in `drfm/robots/five_in_drone.py`
+3. Run all scripts from the repo root. Python resolves local packages (`drfm`, `dynamics`) via the working directory.
+
+4. Verify:
+```sh
+python scripts/train.py --task singleDRFM --headless --num_envs 4 --max_iterations 5
+```
 
 ## Usage
 
@@ -181,7 +190,8 @@ RWR stream (32D) into a hidden state while passing static observations
 split-stream design lets the agent build a mental model of radar over
 time without forcing navigation state through recurrence.
 
-MAPPO works compared to normal PPO and PPO GRU. The model shares parameters
+MAPPO works compared to normal PPO and PPO GRU. Training 25K timesteps with 5
+drones takes roughly 45 minutes on an RTX 4090. The model shares parameters
 between all 5 drones via centralized critic in total its 280-dimensions. Each
 drone has to manage their own observation of radar and DRFM status, i.e. which
 DRFM technique is turned on and which radar is currently illuminating them. Each
