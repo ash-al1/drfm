@@ -81,8 +81,14 @@ class ControlAction(ActionTerm):
 
         self._raw_actions[:] = torch.nan_to_num(actions, nan=0.0, posinf=1.0, neginf=-1.0)
         clamped = self._raw_actions.clamp_(-1.0, 1.0)
-        mapped = (clamped + 1.0) / 2.0
-        # Thrust is proportional to omega^2, so sqrt maps linear action -> linear thrust.
+        # Piecewise-linear: action=0 → hover, -1 → zero thrust, +1 → max thrust
+        hf = self.cfg.hover_frac
+        mapped = torch.where(
+            clamped < 0,
+            hf * (clamped + 1.0),              # [-1, 0] → [0, hover_frac]
+            hf + (1.0 - hf) * clamped,          # [ 0, 1] → [hover_frac, 1]
+        )
+        mapped = mapped.clamp(min=0.25)  # floor at hover thrust — drone can't sink
         omega_ref = self.cfg.omega_max * torch.sqrt(mapped)
         omega_real = self._motor.compute(omega_ref)
         self._processed_actions = self._allocation.compute(omega_real)
@@ -127,3 +133,4 @@ class ControlActionCfg(ActionTermCfg):
     max_rate: list[float] = (50000.0, 50000.0, 50000.0, 50000.0)
     min_rate: list[float] = (-50000.0, -50000.0, -50000.0, -50000.0)
     use_motor_model: bool = False
+    hover_frac: float = 0.25

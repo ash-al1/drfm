@@ -68,7 +68,7 @@ def heading_to_goal(
     command_name: str,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Alignment of velocity with goal direction in [0, 1]; 1.0 means flying directly toward goal."""
+    """Alignment of velocity with goal direction in [-1, 1]; 1.0 means flying directly toward goal."""
     asset: Articulation = env.scene[asset_cfg.name]
     drone_pos = asset.data.root_pos_w
     drone_vel = asset.data.root_lin_vel_w
@@ -78,8 +78,7 @@ def heading_to_goal(
     speed = torch.norm(drone_vel, dim=1, keepdim=True).clamp(min=0.5)
     vel_dir = drone_vel / speed
 
-    dot = (vel_dir * vec_to_goal).sum(dim=1).clamp(-1.0, 1.0)
-    return (dot + 1.0) * 0.5
+    return (vel_dir * vec_to_goal).sum(dim=1).clamp(-1.0, 1.0)
 
 
 def arrived(
@@ -115,12 +114,22 @@ def forward_speed(
     target_speed: float = 4.0,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Speed toward goal normalised by target_speed, clamped to [0, 1]; positive when closing on goal."""
+    """Speed toward goal normalised by target_speed, clamped to [-1, 1]; negative when moving away from goal."""
     asset: Articulation = env.scene[asset_cfg.name]
     goal  = env.command_manager.get_term(command_name).command[:, :3]
     vec_to_goal = math_utils.normalize(goal - asset.data.root_pos_w)
     speed_toward = (asset.data.root_lin_vel_w * vec_to_goal).sum(dim=1)
-    return (speed_toward / target_speed).clamp(0.0, 1.0)
+    return (speed_toward / target_speed).clamp(-1.0, 1.0)
+
+
+def downward_velocity_penalty(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalises sinking only — does not penalise climbing."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    vz = asset.data.root_lin_vel_w[:, 2]
+    return (-vz).clamp(min=0.0)
 
 
 def ang_vel_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
@@ -157,11 +166,11 @@ def altitude_hold(
     tolerance: float = 1.0,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Exponential reward for staying near target altitude"""
+    """Penalty for deviating from target altitude. Returns 0.0 at target, approaches 1.0 as error grows."""
     asset: Articulation = env.scene[asset_cfg.name]
     height = asset.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
     error = torch.abs(height - target_z)
-    return torch.exp(-error / tolerance)
+    return (1.0 - torch.exp(-error / tolerance)).clamp(0.0, 1.0)
 
 
 def action_smoothness(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -171,11 +180,9 @@ def action_smoothness(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 def waypoint_reached(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
-    """Fractional reward based on waypoints visited so far."""
+    """Binary reward on the single step a waypoint is consumed."""
     cmd = env.command_manager.get_term(command_name)
-    total = cmd.cfg.waypoints_per_episode
-    visited = cmd._waypoints_visited.float()
-    return visited / max(total, 1)
+    return cmd.just_reached.float()
 
 
 def drfm_effectiveness(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -195,3 +202,9 @@ def smart_jamming(env: ManagerBasedRLEnv) -> torch.Tensor:
     is_jamming = (drfm._technique != 0).float()
     threatened = (rm.track_quality.max(dim=1).values >= 0.3).float()
     return is_jamming * threatened
+
+def vertical_velocity_penalty(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Penalizes upward velocity to discourage altitude climbing."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    vz = asset.data.root_lin_vel_w[:, 2]
+    return vz.clamp(min=0.0)

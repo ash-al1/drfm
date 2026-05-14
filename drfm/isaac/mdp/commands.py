@@ -35,6 +35,7 @@ class WaypointCommand(CommandTerm):
         self._previous_pos = self.robot.data.root_pos_w.clone()
         self._waypoint_idx = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self._waypoints_visited = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self.just_reached = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         self._waypoints = torch.zeros(
             self.num_envs, cfg.waypoints_per_episode, 3, device=self.device
         )
@@ -67,12 +68,19 @@ class WaypointCommand(CommandTerm):
         n = len(env_ids)
         total = self.cfg.waypoints_per_episode
         wp = torch.zeros(n, total, 3, device=self.device)
-        for i in range(total):
-            wp[:, i, :] = self._sample_valid_positions(n)
-            wp[:, i, :] += self._env.scene.env_origins[env_ids]
+        if self.cfg.static_waypoints is not None:
+            pts = torch.tensor(self.cfg.static_waypoints, dtype=torch.float32, device=self.device)
+            origins = self._env.scene.env_origins[env_ids]  # (n, 3)
+            for i in range(total):
+                wp[:, i, :] = pts[i].unsqueeze(0) + origins
+        else:
+            for i in range(total):
+                wp[:, i, :] = self._sample_valid_positions(n)
+                wp[:, i, :] += self._env.scene.env_origins[env_ids]
         self._waypoints[env_ids] = wp
         self._waypoint_idx[env_ids] = 0
         self._waypoints_visited[env_ids] = 0
+        self.just_reached[env_ids] = False
         self._all_done[env_ids] = False
         self._command[env_ids, :3] = wp[:, 0, :]
         self._command[env_ids, 3:] = torch.tensor([0.0, 0.0, 0.0, 1.0], device=self.device)
@@ -111,12 +119,14 @@ class WaypointCommand(CommandTerm):
             self._previous_pos = self.robot.data.root_pos_w.clone()
             return
 
+        self.just_reached[:] = False
         idx = torch.arange(self.num_envs, device=self.device)
         current_goals = self._waypoints[idx, self._waypoint_idx]
         dist = torch.norm(self.robot.data.root_pos_w - current_goals, dim=1)
         arrived_mask = (dist < self.cfg.arrival_threshold) & ~self._all_done
 
         if arrived_mask.any():
+            self.just_reached |= arrived_mask
             self._waypoint_idx[arrived_mask] += 1
             self._waypoints_visited[arrived_mask] += 1
 
@@ -175,6 +185,9 @@ class WaypointCommandCfg(CommandTermCfg):
         ((27.0, -5.0, 1.5), (0.5, 2.0, 1.5)),
     )
     exclusion_zones: tuple = ()   # ((x, y, radius), ...) - 2D circular no-spawn zones
+    # When set, waypoints are assigned in order from this list instead of sampled.
+    # Must contain exactly `waypoints_per_episode` entries as (x, y, z) tuples in env-local coords.
+    static_waypoints: tuple | None = None
 
     target_visualizer_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/ReconCommand/goal_ring",

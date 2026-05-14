@@ -1,7 +1,7 @@
 # Tasks:
 
 + Add SKRL multi agent
-+ 
++ WP 3/3 bug
 + POMDP - RWR and radar have info when they should not
     - fix rwr\_observations
     - agent infers radar state from signal behavior instead

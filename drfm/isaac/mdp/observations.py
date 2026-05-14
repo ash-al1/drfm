@@ -81,6 +81,26 @@ def rwr_observations(env: ManagerBasedRLEnv) -> torch.Tensor:
     )
 
 
+def altitude_obs(
+    env: ManagerBasedRLEnv,
+    target_z: float = 2.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Height above ground relative to target altitude, shape [N, 1]."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    height = asset.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
+    return (height - target_z).unsqueeze(-1)
+
+
+def vertical_vel_obs(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """World-frame vertical velocity, shape [N, 1]."""
+    asset: Articulation = env.scene[asset_cfg.name]
+    return asset.data.root_lin_vel_w[:, 2].unsqueeze(-1)
+
+
 def drfm_state_obs(env: ManagerBasedRLEnv) -> torch.Tensor:
     """DRFM technique one-hot, normalised POR/VPOR, coordination ratio, and power, shape [N, 8]."""
     return env.action_manager.get_term("drfm_action").get_state_obs()

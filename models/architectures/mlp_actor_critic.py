@@ -75,7 +75,10 @@ class MLPActor(GaussianMixin, Model):
         Model.__init__(self, observation_space=observation_space, action_space=action_space, device=device)
         GaussianMixin.__init__(self, clip_actions=clip_actions, clip_log_std=clip_log_std, min_log_std=min_log_std, max_log_std=max_log_std)
         self.net = _build_mlp(self.num_observations, self.num_actions, hidden_sizes, activation, layer_norm=True)
-        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+        # Start policy output near zero = hover
+        nn.init.uniform_(self.net[-1].weight, -0.01, 0.01)
+        nn.init.constant_(self.net[-1].bias, 0.0)
+        self.log_std_parameter = nn.Parameter(torch.full((self.num_actions,), -1.0))  # std≈0.37, gentler exploration
 
     def compute(self, inputs, role):
         return self.net(inputs["observations"]), {"log_std": self.log_std_parameter}

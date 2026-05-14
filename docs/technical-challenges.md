@@ -6,6 +6,10 @@ to fit our project ~ non-trivially.
 
 ## V3 Problems and solutions
 
+1. Struggling to fix the agent just flying upward/downward and insta-terminating
+    - Added new observations for altitude & vertical velocity
+    - Also the initial bias the drone has is to climb up caused by the control
+      action configuration
 1. Fixed proximity penalty given we calculate distance to objects properly
     - Remove outer boundary walls from proximity penalty, there already is a
       termination on them ; penalty applied on drones spawning next to walls

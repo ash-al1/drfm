@@ -96,7 +96,10 @@ class GRUActor(GaussianMixin, _GRUBase):
 
         act_dim = self.num_actions
         self.net = _build_mlp(self._mlp_input_dim, act_dim, hidden_sizes, activation, layer_norm=True)
-        self.log_std_parameter = nn.Parameter(torch.zeros(act_dim))
+        # Start policy output near zero = hover
+        nn.init.uniform_(self.net[-1].weight, -0.01, 0.01)
+        nn.init.constant_(self.net[-1].bias, 0.0)
+        self.log_std_parameter = nn.Parameter(torch.full((act_dim,), -1.0))  # std≈0.37, gentler exploration
 
     def compute(self, inputs, role):
         features, rnn_out = self._gru_forward(inputs)

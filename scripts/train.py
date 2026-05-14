@@ -64,7 +64,12 @@ from drfm.agents.train_utils import (
 )
 
 algorithm = args_cli.algorithm.lower()
-agent_cfg_entry_point = "skrl_cfg_entry_point" if algorithm in ("ppo", "ppo_gru") else f"skrl_{algorithm}_cfg_entry_point"
+if algorithm == "ppo_gru":
+    agent_cfg_entry_point = "skrl_ppo_gru_cfg_entry_point"
+elif algorithm == "ppo":
+    agent_cfg_entry_point = "skrl_cfg_entry_point"
+else:
+    agent_cfg_entry_point = f"skrl_{algorithm}_cfg_entry_point"
 
 
 @hydra_task_config(args_cli.task, agent_cfg_entry_point)
@@ -103,6 +108,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         f"run_dir={run_dir}\ntotal_timesteps={agent_cfg['trainer']['timesteps']:,}",
         flush=True,
     )
+
+    robot = env.unwrapped.scene["robot"]
+    print("Body names:", robot.body_names)
+    print("Per-body masses:", robot.data.default_mass[0])
 
     save_hyperparams(env, env_cfg, agent_cfg, args_cli, run_dir, algorithm)
 

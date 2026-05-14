@@ -320,22 +320,29 @@ def save_hyperparams(
         "num_envs": env_cfg.scene.num_envs,
         "total_timesteps": agent_cfg["trainer"]["timesteps"],
         **algo_hp,
-        "waypoints_per_episode": env_cfg.commands.target.waypoints_per_episode,
-        "w_progress": env_cfg.rewards.progress.weight,
-        "w_heading": env_cfg.rewards.heading.weight,
-        "w_waypoint_reached": env_cfg.rewards.waypoint_reached.weight,
-        "w_completion_bonus": env_cfg.rewards.completion_bonus.weight,
-        "w_terminating": env_cfg.rewards.terminating.weight,
-        "w_step_penalty": env_cfg.rewards.step_penalty.weight,
-        "w_proximity": env_cfg.rewards.proximity.weight,
         "terrain": "flat",
         "obstacles": True,
         "radars": True,
     }
+    try:
+        hp["waypoints_per_episode"] = env_cfg.commands.target.waypoints_per_episode
+    except AttributeError:
+        pass
     for attr, key in [
+        ("progress", "w_progress"),
+        ("heading", "w_heading"),
+        ("waypoint_reached", "w_waypoint_reached"),
+        ("completion_bonus", "w_completion_bonus"),
+        ("terminating", "w_terminating"),
+        ("step_penalty", "w_step_penalty"),
+        ("alive", "w_alive"),
+        ("proximity", "w_proximity"),
         ("forward_speed", "w_forward_speed"),
         ("distance_penalty", "w_distance_penalty"),
         ("ang_vel_l2", "w_ang_vel_l2"),
+        ("ang_vel", "w_ang_vel"),
+        ("altitude", "w_altitude"),
+        ("upright", "w_upright"),
     ]:
         try:
             hp[key] = getattr(env_cfg.rewards, attr).weight

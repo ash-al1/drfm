@@ -8,7 +8,7 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 # World-frame offset from drone position to camera eye.
-_CAM_OFFSET = np.array([-5.0, 10.0, 20.0])
+_CAM_OFFSET = np.array([-5.0, 10.0, 5.0])
 
 
 class CameraFollower:

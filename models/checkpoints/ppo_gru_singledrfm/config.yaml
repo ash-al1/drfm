@@ -1,8 +1,8 @@
 algorithm: PPO_GRU
 task: singledrfm
-timestamp: '2026-05-13T13:49:37'
+timestamp: '2026-05-13T15:58:31'
 architecture: mlp_actor_critic
-observation_dim: 54
+observation_dim: 56
 action_dim: 11
 hidden_sizes:
 - 256

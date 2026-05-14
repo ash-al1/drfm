@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 
 # Phase-2 obs includes base(14) + 3 radars×10 + drfm_state(8) = 52 dims minimum,
 # but the last accessed index is 61 (drfm power), so phase-2 obs dim >= 62.
-PHASE2_MIN_OBS_DIM = 62
+PHASE2_MIN_OBS_DIM = 64
 
 algorithm = args_cli.algorithm.lower()
 
@@ -187,8 +187,8 @@ def main() -> None:
                 target_b  = _pre_obs[:3]
                 wp_rem    = int(round(_pre_obs[3].item() * wp_total))
                 quat      = _pre_obs[4:8]
-                lin_vel   = _pre_obs[8:11]
-                ang_vel   = _pre_obs[11:14]
+                lin_vel   = _pre_obs[10:13]
+                ang_vel   = _pre_obs[13:16]
                 _, _, yaw = _quat_to_euler_deg(quat.tolist())
                 dist      = torch.norm(target_b).item()
                 spd       = torch.norm(lin_vel).item()
@@ -212,14 +212,14 @@ def main() -> None:
                         _TECH  = ["OFF", "RGPO", "VGPO", "RVGPO"]
                         radar_parts = []
                         for i in range(3):
-                            b     = 14 + i * 10
+                            b     = 16 + i * 10
                             state = int(_pre_obs[b + 5 : b + 9].argmax().item())
                             tq    = _pre_obs[b + 9].item()
                             radar_parts.append(f"{_RADAR[i]}:{_STATE[state]} {tq:.2f}")
-                        tech      = int(_pre_obs[54:58].argmax().item())
-                        por       = _pre_obs[58].item() * 500
-                        vpor      = _pre_obs[59].item() * 200
-                        pwr       = _pre_obs[61].item()
+                        tech      = int(_pre_obs[56:60].argmax().item())
+                        por       = _pre_obs[60].item() * 500
+                        vpor      = _pre_obs[61].item() * 200
+                        pwr       = _pre_obs[63].item()
                         param_str = ""
                         if tech == 1:
                             param_str = f"  por={por:.0f}m/s"

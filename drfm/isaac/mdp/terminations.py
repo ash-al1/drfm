@@ -49,3 +49,15 @@ def all_waypoints_done(
 def radar_lock(env: ManagerBasedRLEnv) -> torch.Tensor:
     """True when any radar has achieved a firm lock on the drone (tq threshold exceeded)."""
     return env.action_manager.get_term("drfm_action").radar_manager.any_locked
+
+
+_BAD_TERM_NAMES = ("collision", "too_high", "radar_lock")
+
+
+def is_bad_termination(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """True only when the episode ends due to collision, too_high, or radar_lock — not timeout or success."""
+    tm = env.termination_manager
+    active = [name for name in _BAD_TERM_NAMES if name in tm._term_name_to_term_idx]
+    if not active:
+        return torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+    return torch.stack([tm.get_term(name) for name in active], dim=1).any(dim=1)

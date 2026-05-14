@@ -1,43 +1,42 @@
 seed: 1
+
 models:
   policy:
-    clip_actions: false
-    clip_log_std: true
+    clip_actions: False
+    clip_log_std: True
     min_log_std: -20.0
     max_log_std: 2.0
     network:
-    - layers:
-      - 256
-      - 256
-      - 256
-      activations: elu
+      - layers: [256, 256, 256]
+        activations: elu
   value:
-    clip_actions: false
+    clip_actions: False
+
 agent:
-  rollouts: 256
+  rollouts: 512
   learning_epochs: 5
-  mini_batches: 8
+  mini_batches: 16
   discount_factor: 0.99
   lambda: 0.95
-  learning_rate: 0.0001
+  learning_rate: 3.0e-05
   learning_rate_scheduler_kwargs:
     kl_threshold: 0.008
-  random_timesteps: 512
+  random_timesteps: 0
   learning_starts: 0
   grad_norm_clip: 1.0
   ratio_clip: 0.2
   value_clip: 0.2
-  clip_predicted_values: true
+  clip_predicted_values: True
   entropy_loss_scale: 0.02
   value_loss_scale: 1.0
   kl_threshold: 0.0
-  time_limit_bootstrap: true
+  time_limit_bootstrap: True
   experiment:
-    directory: /home/ic3/ic3/drfm/outputs/drone_recon
-    experiment_name: ppo_gru
+    directory: "drone_recon"
+    experiment_name: ""
     write_interval: 250
     checkpoint_interval: 0
+
 trainer:
-  timesteps: 10000
+  timesteps: 5000
   environment_info: metrics
-  close_environment_at_exit: false
