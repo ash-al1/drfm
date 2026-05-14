@@ -149,6 +149,17 @@ RWR stream (32D) into a hidden state while passing static observations
 split-stream design lets the agent build a mental model of radar over
 time without forcing navigation state through recurrence.
 
+MAPPO works compared to normal PPO and PPO GRU. The model shares parameters
+between all 5 drones via centralized critic in total its 280-dimensions. Each
+drone has to manage their own observation of radar and DRFM status, i.e. which
+DRFM technique is turned on and which radar is currently illuminating them. Each
+drone receives a shared reward by averaging out all individual rewards to
+encourage a team effort. Realistically, this is not ideal at all but works as a
+starting point. Each drone should maximize its own effort given its belief, and
+state of environment not get bogged down by drones abilities (Mini4). I could
+not realistically find online any library to incorporate QMIX or similar, RayLib
+exists but so vastly different than current implementation.:w
+
 All other agents mentioned, DQN, REINFORCE, vanilla Actor-Critic, DDPG, TD3 and
 TRPO cannot be used for any of these reasons: discrete only, continuous only,
 higher variance. Also PPO is pretty popular compared to all the others ...
@@ -216,10 +227,17 @@ image of BAE systems decoy as header in this file.
 1. Properly get MAPPO & PPO GRU working.
     - I need an easier way to validate whats going on, visualize inconsistencies
       and debug easier.
+    - MAPPO does work compared to dead PPO (GRU) but collision into obtacles
+      isn't solved and both drones and radar need to inner communicate with each
+      other.
 2. Change reward structure so its not unbearably fragile.
 3. Change environment to be more realistic.
 4. Add IQ waveforms using USRP recorded signals instead of janky radar
    interactions we current have.
+5. Radars should share communication with each other to fit more realistic
+   environment.
+    - Also the calculations are way dumbed down to allow scaffolding training,
+      but we never reverted values.
 ```
 
 

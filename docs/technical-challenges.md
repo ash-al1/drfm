@@ -6,6 +6,17 @@ to fit our project ~ non-trivially.
 
 ## V3 Problems and solutions
 
+1. MAPPO actually works a lot better than PPO and PPO_GRU i dont know why. All
+   drones share a single policy by sharing their parameters and the global gets
+   flattened to a single dimension (global state, i.e. centralized critic). 
+    - MAPPO differing from the others actually passes observation inputs not
+      state inputs.
+    - Current fault is sharing centralized critic and cooperative gaming.
+      Surprisingly this worked better than I expected, given Mini4 content this
+      should not have worked that well. My assumption is because of how easy the
+      environment is, this worked fine w.r.t static environment.
+    - MAPPO has no scaffolding it trains both navigation and DRFM modules at the
+      same time (PPO+GRU contains scaffolding and still fails).
 1. PPO_GRU fails to hover and navigate completely, high collision rate ; agent
    just gradually falls to the ground
     - Action mapping (motor, allocation) is not good. Added piecewise-linear

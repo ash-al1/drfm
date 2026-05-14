@@ -28,7 +28,7 @@ parser.add_argument("--task", type=str, default="singleDRFM")
 parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--checkpoint", type=str, default=None)
 parser.add_argument("--max_iterations", type=int, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC", "MAPPO"])
 parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
 
 AppLauncher.add_app_launcher_args(parser)
@@ -54,7 +54,7 @@ import isaaclab_tasks  # noqa: F401
 import drfm.isaac  # noqa: F401
 
 from skrl.trainers.torch import SequentialTrainer
-from drfm.agents.builder import build_ppo_agent, build_ppo_gru_agent, build_sac_agent
+from drfm.agents.builder import build_mappo_agent, build_ppo_agent, build_ppo_gru_agent, build_sac_agent
 from drfm.agents.train_utils import (
     EpisodeStatsWrapper,  # noqa: F401
     create_env,
@@ -68,6 +68,8 @@ if algorithm == "ppo_gru":
     agent_cfg_entry_point = "skrl_ppo_gru_cfg_entry_point"
 elif algorithm == "ppo":
     agent_cfg_entry_point = "skrl_cfg_entry_point"
+elif algorithm == "mappo":
+    agent_cfg_entry_point = "skrl_mappo_cfg_entry_point"
 else:
     agent_cfg_entry_point = f"skrl_{algorithm}_cfg_entry_point"
 
@@ -97,11 +99,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         agent = build_ppo_gru_agent(env, agent_cfg)
     elif algorithm == "sac":
         agent = build_sac_agent(env, agent_cfg)
+    elif algorithm == "mappo":
+        agent = build_mappo_agent(env, agent_cfg)
     else:
         agent = build_ppo_agent(env, agent_cfg)
     _agent_ref[0] = agent
 
-    param_count = sum(p.numel() for p in agent.policy.parameters())
+    # Policy may be per-agent dict for MAPPO; use the first agent's policy for param count
+    policy_ref = agent.policy if hasattr(agent, "policy") else next(iter(agent.policies.values()))
+    param_count = sum(p.numel() for p in policy_ref.parameters())
     print(
         f"algorithm={args_cli.algorithm.upper()}  task={args_cli.task}"
         f"  num_envs={env_cfg.scene.num_envs}  params={param_count:,}  device={agent.device}\n"
@@ -109,11 +115,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         flush=True,
     )
 
-    robot = env.unwrapped.scene["robot"]
-    print("Body names:", robot.body_names)
-    print("Per-body masses:", robot.data.default_mass[0])
+    if algorithm != "mappo":
+        robot = env.unwrapped.scene["robot"]
+        print("Body names:", robot.body_names)
+        print("Per-body masses:", robot.data.default_mass[0])
 
-    save_hyperparams(env, env_cfg, agent_cfg, args_cli, run_dir, algorithm)
+    if algorithm != "mappo":
+        save_hyperparams(env, env_cfg, agent_cfg, args_cli, run_dir, algorithm)
 
     resume_path = retrieve_file_path(args_cli.checkpoint) if args_cli.checkpoint else None
     if resume_path:

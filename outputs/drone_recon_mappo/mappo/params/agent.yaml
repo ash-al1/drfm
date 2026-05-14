@@ -1,0 +1,43 @@
+seed: 1
+models:
+  policy:
+    clip_actions: false
+    clip_log_std: true
+    min_log_std: -20.0
+    max_log_std: 2.0
+    network:
+    - layers:
+      - 256
+      - 256
+      - 256
+      activations: elu
+  value:
+    clip_actions: false
+agent:
+  rollouts: 256
+  learning_epochs: 5
+  mini_batches: 8
+  discount_factor: 0.99
+  lambda: 0.95
+  learning_rate: 0.0001
+  learning_rate_scheduler_kwargs:
+    kl_threshold: 0.008
+  random_timesteps: 512
+  learning_starts: 0
+  grad_norm_clip: 1.0
+  ratio_clip: 0.2
+  value_clip: 0.2
+  clip_predicted_values: true
+  entropy_loss_scale: 0.02
+  value_loss_scale: 1.0
+  kl_threshold: 0.0
+  time_limit_bootstrap: true
+  experiment:
+    directory: /home/ic3/ic3/drfm/outputs/drone_recon_mappo
+    experiment_name: mappo
+    write_interval: 250
+    checkpoint_interval: 0
+trainer:
+  timesteps: 25000
+  environment_info: metrics
+  close_environment_at_exit: false

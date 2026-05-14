@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Mohammad Ali
 
+import copy
+
 import torch
 
 from skrl.agents.torch.base import ExperimentCfg
 from skrl.agents.torch.ppo import PPO, PPO_CFG, PPO_RNN
 from skrl.agents.torch.sac import SAC, SAC_CFG
 from skrl.memories.torch import RandomMemory
+from skrl.multi_agents.torch.mappo import MAPPO, MAPPO_CFG
 from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveLR
 
 from models.architectures.mlp_actor_critic import MLPActor, MLPCritic, MLPSACCritic
+from models.architectures.mappo_actor_critic import MAPPOActor, MAPPOCentralizedCritic
 from models.architectures.rnn_actor_critic import GRUActor, GRUCritic
 
 
@@ -243,6 +247,118 @@ def build_ppo_gru_agent(env, agent_cfg, *, memory_size: int | None = None, train
         models=models, memory=memory, cfg=cfg,
         observation_space=env.observation_space,
         action_space=env.action_space,
+        device=env.device,
+    )
+
+
+class LoggedMAPPO(MAPPO):
+    """MAPPO subclass that captures training metrics after each update."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_metrics = {}
+        self._update_count = 0
+
+    def _update(self, timestep, timesteps):
+        self._update_count += 1
+        MAPPO._update(self, timestep, timesteps)
+        self.last_metrics = {k: list(v) for k, v in self.tracking_data.items()}
+
+
+def build_mappo_agent(env, agent_cfg, *, memory_size: int | None = None, training: bool = True):
+    """Build a MAPPO agent with parameter-shared actor and centralized critic.
+
+    Args:
+        env: Skrl-wrapped MARL environment exposing possible_agents, observation_spaces,
+             action_spaces, and state_spaces.
+        agent_cfg: Agent configuration dict (from skrl_mappo_cfg.yaml).
+        memory_size: Rollout buffer size. Defaults to agent_cfg rollouts (training) or 1.
+        training: If True, configure for training with LoggedMAPPO; else use MAPPO.
+    """
+    agent_params = agent_cfg["agent"]
+    model_cfg = agent_cfg["models"]
+    hidden_sizes = tuple(model_cfg["policy"]["network"][0]["layers"])
+    activation = model_cfg["policy"]["network"][0]["activations"]
+
+    possible_agents = env.possible_agents
+    obs_space_0 = env.observation_spaces[possible_agents[0]]
+    act_space_0 = env.action_spaces[possible_agents[0]]
+    state_space_0 = env.state_spaces[possible_agents[0]]
+
+    # One shared actor instance (parameter sharing across agents)
+    shared_actor = MAPPOActor(
+        obs_space_0, act_space_0, env.device,
+        hidden_sizes=hidden_sizes, activation=activation,
+        clip_actions=model_cfg["policy"].get("clip_actions", False),
+        clip_log_std=model_cfg["policy"].get("clip_log_std", True),
+        min_log_std=model_cfg["policy"].get("min_log_std", -20.0),
+        max_log_std=model_cfg["policy"].get("max_log_std", 2.0),
+    )
+    # Centralized critic takes concatenated all-agent observations as state
+    centralized_critic = MAPPOCentralizedCritic(
+        state_space_0, act_space_0, env.device,
+        hidden_sizes=hidden_sizes, activation=activation,
+        clip_actions=model_cfg["value"].get("clip_actions", False),
+    )
+    models = {a: {"policy": shared_actor, "value": centralized_critic} for a in possible_agents}
+
+    if memory_size is None:
+        memory_size = agent_params["rollouts"] if training else 1
+    memories = {
+        a: RandomMemory(memory_size=memory_size, num_envs=env.num_envs, device=env.device)
+        for a in possible_agents
+    }
+
+    cfg = MAPPO_CFG(
+        observation_preprocessor=RunningStandardScaler,
+        observation_preprocessor_kwargs={"size": obs_space_0, "device": env.device},
+        state_preprocessor=RunningStandardScaler,
+        state_preprocessor_kwargs={"size": state_space_0, "device": env.device},
+        value_preprocessor=RunningStandardScaler,
+        value_preprocessor_kwargs={"size": 1, "device": env.device},
+        learning_rate_scheduler_kwargs=None,
+    )
+
+    if training:
+        cfg.rollouts = agent_params["rollouts"]
+        cfg.learning_epochs = agent_params["learning_epochs"]
+        cfg.mini_batches = agent_params["mini_batches"]
+        cfg.discount_factor = agent_params["discount_factor"]
+        cfg.gae_lambda = agent_params.get("gae_lambda", agent_params.get("lambda", 0.95))
+        cfg.learning_rate = agent_params["learning_rate"]
+        cfg.learning_rate_scheduler = KLAdaptiveLR
+        cfg.learning_rate_scheduler_kwargs = agent_params.get("learning_rate_scheduler_kwargs") or None
+        cfg.random_timesteps = agent_params.get("random_timesteps", 0)
+        cfg.learning_starts = agent_params.get("learning_starts", 0)
+        cfg.grad_norm_clip = agent_params.get("grad_norm_clip", 0.5)
+        cfg.ratio_clip = agent_params.get("ratio_clip", 0.2)
+        cfg.value_clip = agent_params.get("value_clip", 0.2)
+        cfg.entropy_loss_scale = agent_params.get("entropy_loss_scale", 0.0)
+        cfg.value_loss_scale = agent_params.get("value_loss_scale", 2.5)
+        cfg.kl_threshold = agent_params.get("kl_threshold", 0.0)
+        cfg.time_limit_bootstrap = agent_params.get("time_limit_bootstrap", False)
+        cfg.experiment = ExperimentCfg(
+            directory=agent_params["experiment"]["directory"],
+            experiment_name=agent_params["experiment"]["experiment_name"],
+            write_interval=agent_params["experiment"].get("write_interval", 1000),
+            checkpoint_interval=agent_params["experiment"].get("checkpoint_interval", 0),
+        )
+        if agent_params.get("rewards_shaper_scale") is not None:
+            scale = agent_params["rewards_shaper_scale"]
+            cfg.rewards_shaper = lambda rewards, *args, **kwargs: rewards * scale
+        agent_cls = LoggedMAPPO
+    else:
+        cfg.experiment = ExperimentCfg(write_interval=0, checkpoint_interval=0)
+        agent_cls = MAPPO
+
+    return agent_cls(
+        possible_agents=possible_agents,
+        models=models,
+        memories=memories,
+        cfg=cfg,
+        observation_spaces=env.observation_spaces,
+        action_spaces=env.action_spaces,
+        state_spaces=env.state_spaces,
         device=env.device,
     )
 

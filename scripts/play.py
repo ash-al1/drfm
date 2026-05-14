@@ -23,7 +23,7 @@ parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--num_envs", type=int, default=None)
 parser.add_argument("--task", type=str, default="singleDRFM")
 parser.add_argument("--checkpoint", type=str, default=None)
-parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC"])
+parser.add_argument("--algorithm", type=str, default="PPO", choices=["PPO", "PPO_GRU", "SAC", "MAPPO"])
 parser.add_argument("--real-time", action="store_true", default=False)
 parser.add_argument("--renderer", type=str, default="RayTracedLighting", choices=["RayTracedLighting", "PathTracing"])
 parser.add_argument("--debug", action="store_true", default=False)
@@ -49,7 +49,7 @@ import drfm.isaac  # noqa: F401
 
 logging.basicConfig(level=logging.DEBUG if args_cli.debug else logging.INFO, format="%(message)s", force=True)
 
-from drfm.agents.builder import build_ppo_agent, build_ppo_gru_agent, build_sac_agent
+from drfm.agents.builder import build_mappo_agent, build_ppo_agent, build_ppo_gru_agent, build_sac_agent
 from drfm.agents.play_utils import CameraFollower
 
 log = logging.getLogger(__name__)
@@ -132,6 +132,8 @@ def main() -> None:
         agent = build_ppo_gru_agent(env, experiment_cfg, training=False)
     elif algorithm == "sac":
         agent = build_sac_agent(env, experiment_cfg, training=False)
+    elif algorithm == "mappo":
+        agent = build_mappo_agent(env, experiment_cfg, training=False)
     else:
         agent = build_ppo_agent(env, experiment_cfg, training=False)
 
@@ -152,10 +154,11 @@ def main() -> None:
     ep_steps = 0
     prev_episode_ended = False
 
-    log.info("Observation shape: %s", obs.shape)
+    obs_shape = {k: v.shape for k, v in obs.items()} if isinstance(obs, dict) else obs.shape
+    log.info("Observation shape: %s", obs_shape)
     log.info("Episode length: %ss", env_cfg.episode_length_s)
 
-    wp_total = env_cfg.commands.target.waypoints_per_episode
+    wp_total = getattr(getattr(getattr(env_cfg, "commands", None), "target", None), "waypoints_per_episode", 3)
     cam = CameraFollower()
 
     while simulation_app.is_running():
@@ -163,12 +166,14 @@ def main() -> None:
 
         # Save pre-step state - env auto-resets on terminal, wiping this info.
         if args_cli.num_envs == 1:
-            _pre_obs     = obs[0].cpu().clone()
+            _obs0        = obs[list(obs.keys())[0]] if isinstance(obs, dict) else obs
+            _pre_obs     = _obs0[0].cpu().clone()
             _pre_pos     = raw_env.scene["robot"].data.root_pos_w[0].cpu().clone()
             cam.update(_pre_pos.numpy())
 
         with torch.inference_mode():
-            actions, outputs = agent.act(obs, states=None, timestep=0, timesteps=0)
+            states = env.state() if hasattr(env, "state") else None
+            actions, outputs = agent.act(obs, states=states, timestep=0, timesteps=0)
             if hasattr(env, "possible_agents"):
                 actions = {a: outputs[a].get("mean_actions", actions) for a in env.possible_agents}
             else:
@@ -176,10 +181,15 @@ def main() -> None:
             obs, rew, terminated, truncated, info = env.step(actions)
 
         if args_cli.num_envs == 1:
-            o = obs[0].cpu()
-            r = rew[0].item()
-            t = terminated[0].item()
-            tr = truncated[0].item()
+            # Collapse MARL dicts to scalars for single-env display
+            rew_scalar = torch.stack(list(rew.values())).mean(0) if isinstance(rew, dict) else rew
+            term_scalar = torch.stack(list(terminated.values())).any(0) if isinstance(terminated, dict) else terminated
+            trunc_scalar = torch.stack(list(truncated.values())).any(0) if isinstance(truncated, dict) else truncated
+            obs_display = obs[list(obs.keys())[0]] if isinstance(obs, dict) else obs
+            o = obs_display[0].cpu()
+            r = rew_scalar[0].item()
+            t = term_scalar[0].item()
+            tr = trunc_scalar[0].item()
             ep_return += r
             ep_steps += 1
 
@@ -238,13 +248,16 @@ def main() -> None:
                 wp_done = wp_total - int(round(_pre_obs[3].item() * wp_total))
                 outcome = "SUCCESS" if t and wp_done >= wp_total else ("KILLED" if t else "TIMEOUT")
 
-                tm = raw_env.termination_manager
-                fired = [
-                    tm._term_names[i]
-                    for i in range(len(tm._term_names))
-                    if tm._term_dones[0, i].item()
-                ]
-                term_str = ", ".join(fired) if fired else "unknown"
+                if hasattr(raw_env, "termination_manager"):
+                    tm = raw_env.termination_manager
+                    fired = [
+                        tm._term_names[i]
+                        for i in range(len(tm._term_names))
+                        if tm._term_dones[0, i].item()
+                    ]
+                    term_str = ", ".join(fired) if fired else "unknown"
+                else:
+                    term_str = "terminated" if t else "truncated"
 
                 print(
                     f"ep={num_episode}  |  {outcome}  |  steps={ep_steps}  |  ret={ep_return:+.2f}"
@@ -253,7 +266,9 @@ def main() -> None:
                     flush=True,
                 )
 
-        if terminated.any() or truncated.any():
+        done_check = terminated if not isinstance(terminated, dict) else torch.stack(list(terminated.values())).any(0)
+        trunc_check = truncated if not isinstance(truncated, dict) else torch.stack(list(truncated.values())).any(0)
+        if done_check.any() or trunc_check.any():
             num_episode += 1
             ep_return = 0.0
             ep_steps = 0

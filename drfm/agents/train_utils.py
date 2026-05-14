@@ -80,11 +80,19 @@ class EpisodeStatsWrapper(gym.Wrapper):
                 count = int(tm._term_dones[:, i].sum().item())
                 self._term_counts[name] = self._term_counts.get(name, 0) + count
 
-        if self._current_returns is None:
-            self._current_returns = torch.zeros_like(rew)
-            self._current_lengths = torch.zeros(rew.shape[0], dtype=torch.int32, device=rew.device)
+        # Handle MARL dict rewards/dones by collapsing to scalar tensors for stats
+        if isinstance(rew, dict):
+            rew_scalar = torch.stack(list(rew.values())).mean(dim=0)
+            terminated_scalar = torch.stack(list(terminated.values())).any(dim=0)
+            truncated_scalar = torch.stack(list(truncated.values())).any(dim=0)
+        else:
+            rew_scalar, terminated_scalar, truncated_scalar = rew, terminated, truncated
 
-        self._current_returns += rew
+        if self._current_returns is None:
+            self._current_returns = torch.zeros_like(rew_scalar)
+            self._current_lengths = torch.zeros(rew_scalar.shape[0], dtype=torch.int32, device=rew_scalar.device)
+
+        self._current_returns += rew_scalar
         self._current_lengths += 1
 
         m = info.get("metrics", {})
@@ -101,13 +109,13 @@ class EpisodeStatsWrapper(gym.Wrapper):
         if illum is not None:
             self._illum_window += illum.float().mean().item()
 
-        done = terminated | truncated
+        done = terminated_scalar | truncated_scalar
         if done.any():
             done_idx = done.nonzero(as_tuple=False).squeeze(-1)
             for i in done_idx:
                 self._ep_returns.append(self._current_returns[i].item())
                 self._ep_lengths.append(self._current_lengths[i].item())
-                self._ep_timeouts.append(bool(truncated[i].item()))
+                self._ep_timeouts.append(bool(truncated_scalar[i].item()))
             self._current_returns[done_idx] = 0.0
             self._current_lengths[done_idx] = 0
 
@@ -191,7 +199,8 @@ class EpisodeStatsWrapper(gym.Wrapper):
             self._best_return = mean_r
             self._best_step = self._step
             agent = self._agent_ref[0]
-            torch.save(agent.policy.state_dict(), os.path.join(self._run_dir, "actor.pt"))
+            if hasattr(agent, "policy"):
+                torch.save(agent.policy.state_dict(), os.path.join(self._run_dir, "actor.pt"))
             if hasattr(agent, "value"):
                 torch.save(agent.value.state_dict(), os.path.join(self._run_dir, "critic.pt"))
             agent.save(os.path.join(self._run_dir, "agent_best.pt"))
@@ -266,9 +275,11 @@ def create_env(
 
     # Isaac exposes an unbounded action space; SAC squashes via tanh so we clamp
     # the declared space to [-1, 1] to keep it consistent with policy output.
-    _act_dim = env.unwrapped.action_space.shape[-1]
-    env.unwrapped.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=np.float32)
-    env.unwrapped.single_action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=np.float32)
+    # Skip for MARL envs — they have per-agent action_spaces (dict), not a single space.
+    if not isinstance(env.unwrapped, DirectMARLEnv):
+        _act_dim = env.unwrapped.action_space.shape[-1]
+        env.unwrapped.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=np.float32)
+        env.unwrapped.single_action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(_act_dim,), dtype=np.float32)
 
     env = SkrlVecEnvWrapper(stats_wrapper, ml_framework="torch")
     return env, stats_wrapper, _agent_ref
@@ -349,7 +360,8 @@ def save_hyperparams(
 
 def save_final_checkpoint(agent: Any, stats_wrapper: EpisodeStatsWrapper, run_dir: str, t0: float, agent_cfg: dict) -> None:
     """Save final model weights, skrl checkpoint, training metrics JSON, and log completion summary."""
-    torch.save(agent.policy.state_dict(), os.path.join(run_dir, "actor_final.pt"))
+    if hasattr(agent, "policy"):
+        torch.save(agent.policy.state_dict(), os.path.join(run_dir, "actor_final.pt"))
     if hasattr(agent, "value"):
         torch.save(agent.value.state_dict(), os.path.join(run_dir, "critic_final.pt"))
     agent.save(os.path.join(run_dir, "agent_final.pt"))
