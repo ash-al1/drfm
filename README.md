@@ -2,11 +2,13 @@
 
 <table align="center">
     <tr>
-        <td>
-            <img src="media/bae.png" height="200px" />
+        <td align="center">
+            <img src="media/bae.png" height="200px" /><br>
+            BAE- Towed Decoy (AI Gen.)
         </td>
-        <td>
-            <img src="media/mappo.gif" height="200px" />
+        <td align="center">
+            <img src="media/mappo.gif" height="200px" /><br>
+            2 Drone Agents Success/Failure
         </td>
     </tr>
 </table>
@@ -18,7 +20,7 @@ tracking. Maneuverability is based on [9] which is based off the research paper
 [4]. Drone is used to survive some electromagnetic environment with
 deterministic radars that attempt to gain a lock, the DRFM module is trained to
 survive using realistic jamming techniques: transponder and repeater false
-targeting, combination of RGPO and VGPO, and SAR active decoy.
+targeting, combination of Off, RGPO, VGPO and RVGPO.
 
 ## Foundations
 
@@ -26,15 +28,15 @@ We highly recommend readers to go through `docs/` directory for quickly catching
 
 <table align="center">
     <tr>
-        <td>
+        <td align="center">
             <img src="media/rgpo.gif" height="200px" /><br>
             RGPO
         </td>
-        <td>
+        <td align="center">
             <img src="media/vgpo.gif" height="200px" /><br>
             VGPO
         </td>
-        <td>
+        <td align="center">
             <img src="media/rgpo+vgpo.gif" height="200px" /><br>
             Coordinated
         </td>
@@ -58,8 +60,9 @@ Modify robot path in `drfm/robots/five_in_drone.py`
 
 <table align="center">
     <tr>
-        <td>
+        <td align="center">
             <img src="media/phase2.gif" height="200px" /><br>
+            Early PPO Godmode Case
         </td>
     </tr>
 </table>
