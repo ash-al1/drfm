@@ -88,7 +88,7 @@ class ControlAction(ActionTerm):
             hf * (clamped + 1.0),              # [-1, 0] → [0, hover_frac]
             hf + (1.0 - hf) * clamped,          # [ 0, 1] → [hover_frac, 1]
         )
-        mapped = mapped.clamp(min=0.25)  # floor at hover thrust — drone can't sink
+        mapped = mapped.clamp(min=0.25)  # floor at hover thrust - drone can't sink
         omega_ref = self.cfg.omega_max * torch.sqrt(mapped)
         omega_real = self._motor.compute(omega_ref)
         self._processed_actions = self._allocation.compute(omega_real)

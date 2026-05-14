@@ -70,12 +70,12 @@ python3 scripts/play.py --task singleDRFM_stage1 --num_envs 1 --algorithm PPO_GR
 python3 scripts/play.py --task singleDRFM_stage2 --num_envs 1 --algorithm PPO_GRU --debug
 ```
 
-## Justification
+## Algorithms
 
 We used Proximal Policy Optimization (PPO) as the backbone throughout the
 project with Soft Actor-Critic (SAC) added later for ablation & replay buffer
 comparison. Both agents support hybrid discrete-continuous actions which is
-critical for the DRFM module — technique selection is discrete (OFF, RGPO,
+critical for the DRFM module - technique selection is discrete (OFF, RGPO,
 VGPO, RVGPO) while each technique's parameters (pull-off rate, velocity
 pull-off rate, coordination ratio) are continuous. PPO and SAC cover decent
 variance since one is on-policy and the other is off-policy.
@@ -145,6 +145,26 @@ Modify robot path in `drfm/robots/five_in_drone.py`
       ├── checkpoints/
       └── replay_buffers/
 ```
+
+## Note on AI Use and Assets
+
+Claude helped in refactoring old SKRL version 1.4.3 to 2.1.0, although couldn't
+really tell whether it was working or not since agents broke as a result. The
+initial baseline foundations of this project was based on isaac drone racer,
+and we largely stuck with the some allocation and motor usage, largely nothing
+has changed here besides some testing we did with how thrust initializes. The
+MDP structure for actions, observations rewards we took from isaac drone racer
+too and added on top including waypoints, and a lot of reward structure
+primarily so that the drone is limited in altitude (minz and maxz) and urged
+towards the waypoint while preventing itself from colliding with objects.
+
+The radar for both deterministic and probabilistic was designed based on the
+Phillip E. Pace book and I got claude to validate some of the mathematics for
+calculating DRFM and drone interactions. The equations were pulled directly from
+the book or online (SPJ). I did not create any of the assets used (drone mesh,
+USD, URDF and so on), most media was created by me besides the AI generated
+image of BAE systems decoy as header in this file.
+
 
 ## References
 

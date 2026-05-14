@@ -48,7 +48,7 @@ _OBSTACLE_GEOM = (
 
 
 # AABB footprints (cx, cy, half_x, half_y) in env-local coords, matching scene geometry above.
-# Walls are excluded — wall proximity is handled by collision termination.
+# Walls are excluded - wall proximity is handled by collision termination.
 _OBSTACLE_FOOTPRINTS: dict[str, tuple[float, float, float, float]] = {
     "obstacle_center": (25.0,   0.0, 4.0,  1.5),
     "obstacle_n1":     (20.0,   9.0, 2.0,  1.5),
@@ -235,7 +235,7 @@ class CommandsCfg:
 
 @configclass
 class CommandsCfg_Stage1:
-    """Three static waypoints along x at y=0, z=3 — straight line, clear of all obstacles."""
+    """Three static waypoints along x at y=0, z=3 - straight line, clear of all obstacles."""
 
     target = mdp.WaypointCommandCfg(
         asset_name="robot",
@@ -332,11 +332,19 @@ class DroneReconEnvCfg(ManagerBasedRLEnvCfg):
 
 @configclass
 class RewardsCfg_Stage1:
-    alive       = RewTerm(func=mdp.step_penalty,        weight=1.0)
-    upright     = RewTerm(func=mdp.upright_bonus,        weight=0.2)
-    altitude    = RewTerm(func=mdp.altitude_hold,        weight=-0.5,   params={"target_z": 3.0, "tolerance": 1.0})
-    ang_vel     = RewTerm(func=mdp.ang_vel_l2,           weight=-0.005)
-    terminating = RewTerm(func=mdp.is_bad_termination,   weight=-50.0)
+    progress         = RewTerm(func=mdp.progress,                  weight=10.0,  params={"command_name": "target"})
+    heading          = RewTerm(func=mdp.heading_to_goal,           weight=3.0,   params={"command_name": "target"})
+    forward_speed    = RewTerm(func=mdp.forward_speed,             weight=3.0,   params={"command_name": "target", "target_speed": 2.5})
+    waypoint_reached = RewTerm(func=mdp.waypoint_reached,          weight=50.0,  params={"command_name": "target"})
+    completion_bonus = RewTerm(func=mdp.completion_bonus,          weight=100.0, params={"command_name": "target"})
+    upright          = RewTerm(func=mdp.upright_bonus,             weight=0.1)
+    altitude_band    = RewTerm(func=mdp.altitude_hold,             weight=-1.5,  params={"target_z": 3.0, "tolerance": 1.0})
+    downward_vel     = RewTerm(func=mdp.downward_velocity_penalty, weight=-2.0)
+    terminating      = RewTerm(func=mdp.is_bad_termination,        weight=-20.0)
+    step_penalty     = RewTerm(func=mdp.step_penalty,              weight=-0.005)
+    ang_vel_l2       = RewTerm(func=mdp.ang_vel_l2,                weight=-0.01)
+    action_smooth    = RewTerm(func=mdp.action_smoothness,         weight=-0.005)
+    proximity        = RewTerm(func=mdp.proximity_penalty,         weight=-2.0,  params={"obstacle_footprints": _OBSTACLE_FOOTPRINTS, "safe_dist": 2.5, "max_dist": 6.0})
 
 
 @configclass

@@ -59,7 +59,7 @@ class _GRUBase(Model):
         gru_out, new_hidden = self.gru(temporal, hidden)
 
         if states.dim() == 2:
-            gru_out = gru_out[:, -1, :]  # (N, gru_hidden) — take last timestep
+            gru_out = gru_out[:, -1, :]  # (N, gru_hidden) - take last timestep
 
         gru_feat = gru_out if gru_out.dim() == 2 else gru_out.reshape(-1, self._gru_hidden)
 

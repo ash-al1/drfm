@@ -55,7 +55,7 @@ _BAD_TERM_NAMES = ("collision", "too_high", "radar_lock")
 
 
 def is_bad_termination(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """True only when the episode ends due to collision, too_high, or radar_lock — not timeout or success."""
+    """True only when the episode ends due to collision, too_high, or radar_lock - not timeout or success."""
     tm = env.termination_manager
     active = [name for name in _BAD_TERM_NAMES if name in tm._term_name_to_term_idx]
     if not active:

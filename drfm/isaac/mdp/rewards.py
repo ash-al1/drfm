@@ -126,7 +126,7 @@ def downward_velocity_penalty(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Penalises sinking only — does not penalise climbing."""
+    """Penalises sinking only - does not penalise climbing."""
     asset: Articulation = env.scene[asset_cfg.name]
     vz = asset.data.root_lin_vel_w[:, 2]
     return (-vz).clamp(min=0.0)
