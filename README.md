@@ -15,7 +15,7 @@ This project aims to create a realistic Digital Radio Frequency Memory module
 embedded on a drone that operates using Reinforcement Learning algorithms, the
 drone itself also maneuvers using an algorithm tasked with surviving Radar
 tracking. Maneuverability is based on [4] which is based off the research paper
-[1]. Drone is used to survive some electromagnetic environment with
+[4]. Drone is used to survive some electromagnetic environment with
 deterministic radars that attempt to gain a lock, the DRFM module is trained to
 survive using realistic jamming techniques: transponder and repeater false
 targeting, combination of RGPO and VGPO, and SAR active decoy.
@@ -40,6 +40,19 @@ We highly recommend readers to go through `docs/` directory for quickly catching
         </td>
     </tr>
 </table>
+
+## Setup
+
+Make sure Isaac Sim and Lab are [installed](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html#verifying-the-isaac-lab-installation) & environment is setup properly:
+```
+conda env create -f environment.yaml -n [name]
+conda activate [name]
+export ISAACSIM_PATH="${HOME}/isaacsim/_build/linux-x86_64/release"
+export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.sh"
+ln -s ${ISAACSIM_PATH} _isaac_sim
+```
+
+Modify robot path in `drfm/robots/five_in_drone.py`
 
 ## Usage
 
@@ -70,6 +83,51 @@ python3 scripts/play.py --task singleDRFM_stage1 --num_envs 1 --algorithm PPO_GR
 python3 scripts/play.py --task singleDRFM_stage2 --num_envs 1 --algorithm PPO_GRU --debug
 ```
 
+## Environment
+
+**Observations**
+
+| Term | Description |
+|---|---|
+| `target_pos_b` | Next waypoint in body frame |
+| `waypoints_remaining` | Count of remaining waypoints |
+| `attitude` | Quaternion orientation |
+| `altitude` | Altitude error from target z=3 m |
+| `vertical_vel` | Vertical velocity |
+| `lin_vel` | Linear velocity in body frame |
+| `ang_vel` | Angular velocity in body frame |
+| `rwr` | Radar warning receiver per radar |
+| `drfm_state` | DRFM jammer state |
+
+**Actions** (11D)
+
+| Term | Dim | Description |
+|---|---|---|
+| `control_action` | 4 | Per-motor thrust [-1, 1] |
+| `drfm_technique` | 4 | Logits → OFF / RGPO / VGPO / RVGPO |
+| `drfm_params` | 3 | Pull-off rate, velocity pull-off, coordination ratio |
+
+**Rewards**
+
+| Term | Weight | Description |
+|---|---|---|
+| `waypoint_reached` | +50 | Per waypoint bonus |
+| `completion_bonus` | +100 | All waypoints done |
+| `progress` | +5 | Forward progress toward waypoint |
+| `forward_speed` | +2 | Speed toward goal (target 5 m/s) |
+| `heading` | +2 | Aligned heading to goal |
+| `drfm_effective` | +2 | Jamming an active radar |
+| `smart_jam` | +1 | Jamming the right radar for the threat |
+| `power_conserve` | +0.5 | Low DRFM power when not needed |
+| `upright` | +1 | Upright orientation |
+| `terminating` | -200 | Bad termination (collision / radar lock) |
+| `altitude_band` | -5 | Deviation from z=3 m ±1 m |
+| `illumination_low` | -2 | Radar illumination on drone |
+| `proximity` | -3 | Within 2.5–6 m of obstacle |
+| `ang_vel_l2` | -0.02 | Angular velocity magnitude |
+| `action_smooth` | -0.01 | Action jitter between steps |
+| `step_penalty` | -0.01 | Time alive penalty |
+
 ## Algorithms
 
 We used Proximal Policy Optimization (PPO) as the backbone throughout the
@@ -94,19 +152,6 @@ time without forcing navigation state through recurrence.
 All other agents mentioned, DQN, REINFORCE, vanilla Actor-Critic, DDPG, TD3 and
 TRPO cannot be used for any of these reasons: discrete only, continuous only,
 higher variance. Also PPO is pretty popular compared to all the others ...
-
-## Setup
-
-Make sure Isaac Sim and Lab are [installed](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html#verifying-the-isaac-lab-installation) & environment is setup properly:
-```
-conda env create -f environment.yaml -n [name]
-conda activate [name]
-export ISAACSIM_PATH="${HOME}/isaacsim/_build/linux-x86_64/release"
-export ISAACSIM_PYTHON_EXE="${HOME}/isaacsim/_build/linux-x86_64/release/python.sh"
-ln -s ${ISAACSIM_PATH} _isaac_sim
-```
-
-Modify robot path in `drfm/robots/five_in_drone.py`
 
 ## Project Organization
 
@@ -175,6 +220,7 @@ image of BAE systems decoy as header in this file.
 1. Sutton, R. S., & Barto, A. G. *Reinforcement Learning: An Introduction.* MIT Press, 2018.
 1. Merrick, R. *Getting Started with FPGAs: Digital Circuit Design, Verilog, and VHDL for Beginners.* No Starch Press, 2023.
 1. Pace, P. E. *Developing Digital RF Memories and Transceiver Technologies for Electromagnetic Warfare.* Artech House, 2022.
+1. [PPO SKRL](https://skrl.readthedocs.io/en/latest/api/agents/ppo.html)
 1. [Isaac Drone Racer](https://github.com/kousheekc/isaac_drone_racer)
 1. [Isaac Sim: Foundation Model](https://github.com/isaac-sim/IsaacSim)
 1. [Isaac Lab: RL Environments](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html)
